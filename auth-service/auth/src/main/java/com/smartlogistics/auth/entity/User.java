@@ -1,4 +1,4 @@
-package com.smartlogistics.auth.model;
+package com.smartlogistics.auth.entity;
 
 
 import jakarta.persistence.Entity;

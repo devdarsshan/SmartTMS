@@ -1,6 +1,6 @@
 package com.smartlogistics.auth.repo;
 
-import com.smartlogistics.auth.model.User;
+import com.smartlogistics.auth.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
