@@ -20,6 +20,8 @@ public class SecurityConfig {
                 .csrf(customizer -> customizer.disable())
                 .authorizeHttpRequests(request -> request
                     .requestMatchers("/auth/**").permitAll()
+                    .requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/actuator/**").authenticated()
                     .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
