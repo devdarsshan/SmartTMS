@@ -4,6 +4,7 @@ package com.smartlogistics.auth.entity;
 import jakarta.persistence.*;
 
 @Entity
+@Table(name = "auth")
 public class User {
 
     @Id
@@ -13,10 +14,6 @@ public class User {
     private String username;
     @Column(nullable = false)
     private String password;
-    @Column(nullable = false)
-    private String role;
-    @Column(nullable = false)
-    private String email;
 
     public long getUserId() {
         return userId;
@@ -34,14 +31,6 @@ public class User {
         this.username = username;
     }
 
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
-
     public String getPassword() {
         return password;
     }
@@ -50,21 +39,12 @@ public class User {
         this.password = password;
     }
 
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
     @Override
     public String toString() {
         return "User{" +
                 "id=" + userId +
                 ", username='" + username + '\'' +
                 ", password='" + password + '\'' +
-                ", role='" + role + '\'' +
                 '}';
     }
 }

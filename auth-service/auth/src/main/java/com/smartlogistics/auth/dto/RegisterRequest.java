@@ -19,18 +19,6 @@ public class RegisterRequest {
     @Email(message = "Email should be valid")
     private String email;
 
-    @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(ADMIN|USER|DRIVER|DISPATCHER)$", message = "Role must be one of: ADMIN, USER, DRIVER, DISPATCHER")
-    private String role;
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
-
     public String getEmail() {
         return email;
     }

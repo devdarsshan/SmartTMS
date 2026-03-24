@@ -32,14 +32,12 @@ public class AuthService {
     public void register(RegisterRequest request) {
         // Check if user already exists
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            auditService.logRegistration(request.getUsername(), request.getEmail(), 
-                    request.getRole(), false, "User already exists");
+            auditService.logRegistration(request.getUsername(), request.getEmail(),false, "User already exists");
             throw new UserAlreadyExistsException("Username already exists: " + request.getUsername());
         }
 
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            auditService.logRegistration(request.getUsername(), request.getEmail(), 
-                    request.getRole(), false, "Email already exists");
+            auditService.logRegistration(request.getUsername(), request.getEmail(), false, "Email already exists");
             throw new UserAlreadyExistsException("Email already exists: " + request.getEmail());
         }
 
@@ -47,12 +45,9 @@ public class AuthService {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole());
-        user.setEmail(request.getEmail());
         
         userRepository.save(user);
-        auditService.logRegistration(request.getUsername(), request.getEmail(), 
-                request.getRole(), true, "User registered successfully");
+        auditService.logRegistration(request.getUsername(), request.getEmail(),true, "User registered successfully");
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -72,7 +67,7 @@ public class AuthService {
         String token = jwtService.generateToken(user);
         auditService.logLoginAttempt(request.getUsername(), true, "Login successful", clientIp);
         
-        return new AuthResponse(token);
+        return new AuthResponse(token,user.getUserId());
     }
 
     private String getClientIp() {
