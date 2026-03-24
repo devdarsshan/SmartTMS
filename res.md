@@ -1,0 +1,1 @@
+1. Implemented IP-based rate limiting for authentication endpoints using the Bucket4j library. - Auth-service

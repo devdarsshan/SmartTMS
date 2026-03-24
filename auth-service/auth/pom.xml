@@ -98,9 +98,14 @@
 		</dependency>
 		<!-- Rate Limiting -->
 		<dependency>
-			<groupId>io.github.bucket4j</groupId>
-			<artifactId>bucket4j-core</artifactId>
-			<version>7.10.0</version>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+			<version>3.1.8</version>
+		</dependency>
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk11-core</artifactId>
+			<version>8.0.1</version> <!-- or latest -->
 		</dependency>
 		<!-- Lombok for boilerplate reduction -->
 		<dependency>
