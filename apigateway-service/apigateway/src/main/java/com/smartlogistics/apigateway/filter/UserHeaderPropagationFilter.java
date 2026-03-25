@@ -24,14 +24,10 @@ public class UserHeaderPropagationFilter implements GlobalFilter, Ordered {
                 .flatMap(auth->{
                     String username = auth.getToken().getSubject();
                     String userId = auth.getToken().getClaim("userId");
-                    String role = auth.getToken().getClaim("role");
-                    String email = auth.getToken().getClaim("email");
                     ServerHttpRequest mutatedRequest = (ServerHttpRequest) exchange.getRequest()
                             .mutate()
                             .header("X-User-Name", username)
                             .header("X-User-Id", userId)
-                            .header("X-User-Role", role)
-                            .header("X-User-Email", email)
                             .build();
                     return chain.filter(exchange.mutate().request((Consumer<org.springframework.http.server.reactive.ServerHttpRequest.Builder>) mutatedRequest).build());
                 })

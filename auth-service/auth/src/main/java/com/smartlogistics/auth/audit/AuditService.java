@@ -11,10 +11,10 @@ public class AuditService {
     private static final Logger logger = LoggerFactory.getLogger(AuditService.class);
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public void logRegistration(String username, String email, boolean success, String reason) {
+    public void logRegistration(String username, boolean success, String reason) {
         String message = String.format(
                 "[AUDIT] Registration | Username: %s | Email: %s | Success: %s | Reason: %s | Timestamp: %s",
-                username, email, success, reason, LocalDateTime.now().format(formatter)
+                username, success, reason, LocalDateTime.now().format(formatter)
         );
         if (success) {
             logger.info(message);

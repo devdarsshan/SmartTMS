@@ -32,14 +32,10 @@ public class AuthService {
     public void register(RegisterRequest request) {
         // Check if user already exists
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            auditService.logRegistration(request.getUsername(), request.getEmail(),false, "User already exists");
+            auditService.logRegistration(request.getUsername(),false, "User already exists");
             throw new UserAlreadyExistsException("Username already exists: " + request.getUsername());
         }
 
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            auditService.logRegistration(request.getUsername(), request.getEmail(), false, "Email already exists");
-            throw new UserAlreadyExistsException("Email already exists: " + request.getEmail());
-        }
 
         // Create new user
         User user = new User();
@@ -47,7 +43,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         
         userRepository.save(user);
-        auditService.logRegistration(request.getUsername(), request.getEmail(),true, "User registered successfully");
+        auditService.logRegistration(request.getUsername(),true, "User registered successfully");
     }
 
     public AuthResponse login(LoginRequest request) {
