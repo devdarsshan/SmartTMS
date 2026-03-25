@@ -22,8 +22,6 @@ public class JwtService {
         return Jwts.builder()
                 .setSubject(user.getUsername())
                 .claim("userId", user.getUserId())
-                .claim("role", user.getRole())
-                .claim("email", user.getEmail())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24)) // 24 hours
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -32,10 +30,6 @@ public class JwtService {
 
     public String extractUsername(String token) {
         return getClaimsFromToken(token).getSubject();
-    }
-
-    public String extractRole(String token) {
-        return getClaimsFromToken(token).get("role", String.class);
     }
 
     public boolean isTokenValid(String token) {

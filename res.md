@@ -1,1 +1,2 @@
 1. Implemented IP-based rate limiting for authentication endpoints using the Bucket4j library. - Auth-service
+2. Used Specification pattern to create dynamic queries for filtering and sorting user data. - Vehicle-service

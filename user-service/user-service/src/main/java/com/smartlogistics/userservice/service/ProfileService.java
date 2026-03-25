@@ -3,10 +3,15 @@ package com.smartlogistics.userservice.service;
 import com.smartlogistics.userservice.dto.CreateProfileRequest;
 import com.smartlogistics.userservice.dto.UpdateProfileRequest;
 import com.smartlogistics.userservice.entity.UserProfile;
+import com.smartlogistics.userservice.exception.ProfileAlreadyExistsException;
+import com.smartlogistics.userservice.exception.UserprofileNotFoundException;
 import com.smartlogistics.userservice.repo.UserProfileRepo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class ProfileService {
@@ -20,7 +25,7 @@ public class ProfileService {
     public void createUserProfile(CreateProfileRequest request) {
         logger.info("createUserProfile");
         if (userProfileRepo.findByAuthUserid(request.getAuthUserId()).isPresent()) {
-            throw new RuntimeException("User profile already exists");
+            throw new ProfileAlreadyExistsException("User profile already exists");
         }
         UserProfile userProfile = new UserProfile();
         userProfile.setAuthUserId(request.getAuthUserId());
@@ -29,7 +34,7 @@ public class ProfileService {
         userProfile.setLastName(request.getLastName());
         userProfile.setCity(request.getCity());
         userProfile.setPhoneNumber(request.getPhoneNumber());
-        userProfile.setUserRole(request.getUserRole());
+        userProfile.setUserRole(request.getUserRole().toString());
         userProfileRepo.save(userProfile);
         logger.info("createUserProfile success");
     }
@@ -38,7 +43,7 @@ public class ProfileService {
         logger.info("updateUserProfile");
         UserProfile userProfile = userProfileRepo
                 .findByAuthUserid(authUserId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserprofileNotFoundException("User not found"));
 
         if (request.getEmail() != null) {
             userProfile.setEmail(request.getEmail());
@@ -66,5 +71,19 @@ public class ProfileService {
 
         userProfileRepo.save(userProfile);
         logger.info("updateUserProfile success");
+    }
+
+    public ResponseEntity<UserProfile> fetchUserProfile(Long authUserId) {
+        logger.info("fetchUserProfile");
+        UserProfile userProfile =  userProfileRepo.findByAuthUserid(authUserId)
+                    .orElseThrow(() -> new UserprofileNotFoundException("User not found"));
+        return ResponseEntity.ok().body(userProfile);
+    }
+
+    public ResponseEntity<List<UserProfile>> fetchUserProfilesByRoles(String userRole) {
+        logger.info("fetchAllUserProfiles-service");
+        List<UserProfile> userProfiles = userProfileRepo.findByUserRole(userRole);
+        logger.info("{} users with role {} found",userProfiles.size(), userRole);
+        return ResponseEntity.ok().body(userProfiles);
     }
 }

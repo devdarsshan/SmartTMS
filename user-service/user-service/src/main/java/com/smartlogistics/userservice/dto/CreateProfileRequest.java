@@ -1,5 +1,7 @@
 package com.smartlogistics.userservice.dto;
 
+import com.smartlogistics.userservice.enums.DriverStatus;
+import com.smartlogistics.userservice.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,8 +20,9 @@ public class CreateProfileRequest {
     private String phoneNumber;
     @NotBlank(message = "Role is required")
     @Pattern(regexp = "^(ADMIN|USER|DRIVER|DISPATCHER)$", message = "Role must be one of: ADMIN, USER, DRIVER, DISPATCHER")
-    private String userRole;
+    private UserRole userRole;
     private String city;
+    private DriverStatus driverStatus = DriverStatus.ACTIVE;
 
     public String getCity() {
         return city;
@@ -69,11 +72,19 @@ public class CreateProfileRequest {
         this.phoneNumber = phoneNumber;
     }
 
-    public String getUserRole() {
+    public UserRole getUserRole() {
         return userRole;
     }
 
-    public void setUserRole(String userRole) {
+    public void setUserRole(UserRole userRole) {
         this.userRole = userRole;
+    }
+
+    public DriverStatus getDriverStatus() {
+        return driverStatus;
+    }
+
+    public void setDriverStatus(DriverStatus driverStatus) {
+        this.driverStatus = driverStatus;
     }
 }
