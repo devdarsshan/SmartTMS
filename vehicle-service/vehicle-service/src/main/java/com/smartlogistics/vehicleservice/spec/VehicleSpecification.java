@@ -21,14 +21,14 @@ public class VehicleSpecification {
                 vehicleCode == null ? cb.conjunction() : cb.equal(root.get("vehicleCode"), vehicleCode);
     }
 
-    public static Specification<Vehicle> hasRegisteredCity(String registeredCity) {
+    public static Specification<Vehicle> hasFrom(String from) {
         return (root, query, cb) ->
-                registeredCity == null ? cb.conjunction() : cb.equal(root.get("registeredCity"), registeredCity);
+                from == null ? cb.conjunction() : cb.equal(cb.lower(root.get("from")), from.toLowerCase());
     }
 
     public static Specification<Vehicle> hasVehicleStatus(VehicleStatus vehicleStatus) {
         return (root, query, cb) ->
-                vehicleStatus == null ? cb.conjunction() : cb.equal(root.get("status"), vehicleStatus);
+                vehicleStatus == null ? cb.conjunction() : cb.equal(root.get("vehicleStatus"), vehicleStatus);
     }
 
 }

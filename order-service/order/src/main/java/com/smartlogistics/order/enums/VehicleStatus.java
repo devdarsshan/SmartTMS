@@ -1,4 +1,4 @@
-package com.smartlogistics.vehicleservice.enums;
+package com.smartlogistics.order.enums;
 
 public enum VehicleStatus {
     IDLE,

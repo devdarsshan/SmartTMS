@@ -1,38 +1,21 @@
-package com.smartlogistics.vehicleservice.dto;
+package com.smartlogistics.order.dto;
 
-import com.smartlogistics.vehicleservice.enums.VehicleStatus;
-import com.smartlogistics.vehicleservice.enums.VehicleType;
+import com.smartlogistics.order.enums.VehicleStatus;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class VehicleWithDriverDTO {
+public class VehicleDTO {
     private Long vehicleId;
+    private Long driverId;
     private String vehicleName;
     private String vehicleCode;
-    private VehicleType vehicleType;
+    private String vehicleType;
     private String from;
     private String to;
-    private List<String> through;
-    private List<Long> orderIds;
+    private List<String> through = new ArrayList<>();
+    private List<Long> orderIds = new ArrayList<>();
     private VehicleStatus vehicleStatus;
-    private DriverInfoDTO driver;
-
-    public VehicleWithDriverDTO() {}
-
-    public VehicleWithDriverDTO(Long vehicleId, String vehicleName, String vehicleCode, VehicleType vehicleType,
-                                String from, String to, List<String> through, List<Long> orderIds,
-                                VehicleStatus vehicleStatus, DriverInfoDTO driver) {
-        this.vehicleId = vehicleId;
-        this.vehicleName = vehicleName;
-        this.vehicleCode = vehicleCode;
-        this.vehicleType = vehicleType;
-        this.from = from;
-        this.to = to;
-        this.through = through;
-        this.orderIds = orderIds;
-        this.vehicleStatus = vehicleStatus;
-        this.driver = driver;
-    }
 
     public Long getVehicleId() {
         return vehicleId;
@@ -40,6 +23,14 @@ public class VehicleWithDriverDTO {
 
     public void setVehicleId(Long vehicleId) {
         this.vehicleId = vehicleId;
+    }
+
+    public Long getDriverId() {
+        return driverId;
+    }
+
+    public void setDriverId(Long driverId) {
+        this.driverId = driverId;
     }
 
     public String getVehicleName() {
@@ -58,11 +49,11 @@ public class VehicleWithDriverDTO {
         this.vehicleCode = vehicleCode;
     }
 
-    public VehicleType getVehicleType() {
+    public String getVehicleType() {
         return vehicleType;
     }
 
-    public void setVehicleType(VehicleType vehicleType) {
+    public void setVehicleType(String vehicleType) {
         this.vehicleType = vehicleType;
     }
 
@@ -105,13 +96,4 @@ public class VehicleWithDriverDTO {
     public void setVehicleStatus(VehicleStatus vehicleStatus) {
         this.vehicleStatus = vehicleStatus;
     }
-
-    public DriverInfoDTO getDriver() {
-        return driver;
-    }
-
-    public void setDriver(DriverInfoDTO driver) {
-        this.driver = driver;
-    }
 }
-

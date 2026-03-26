@@ -13,6 +13,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,44 +40,128 @@ public class VehicleService {
         vehicle.setVehicleName(request.getVehicleName());
         vehicle.setVehicleCode(request.getVehicleCode());
         vehicle.setVehicleType(request.getVehicleType());
-        vehicle.setRegisteredCity(request.getRegisteredCity());
+        vehicle.setFrom(request.getFrom());
+        vehicle.setTo(request.getTo());
+        vehicle.setThrough(new ArrayList<>(request.getThrough()));
+        vehicle.setOrderIds(new ArrayList<>());
         vehicleRepositiory.save(vehicle);
         logger.info("Vehicle created");
     }
 
     public Vehicle updateVehicle(Vehicle vehicle) {
         logger.info("Entering UpdateVehicle");
-        Vehicle existingVehicle = vehicleRepositiory.findByVehicleCode(vehicle.getVehicleCode()).orElse(null);
+        Vehicle existingVehicle = vehicleRepositiory.findById(vehicle.getVehicleId()).orElse(null);
         if(existingVehicle == null) {
-            throw new VehicleDoesNotExistException("Vehicle with code " + vehicle.getVehicleCode() + " does not exist");
+            throw new VehicleDoesNotExistException("Vehicle with id " + vehicle.getVehicleId() + " does not exist");
         }
-        if(existingVehicle.getVehicleId() != vehicle.getVehicleId() && existingVehicle.getVehicleCode().equals(vehicle.getVehicleCode())) {
+        Vehicle duplicateVehicle = vehicleRepositiory.findByVehicleCode(vehicle.getVehicleCode()).orElse(null);
+        if(duplicateVehicle != null && !duplicateVehicle.getVehicleId().equals(vehicle.getVehicleId())) {
             throw new VehicleExistsException("Another Vehicle with code " + vehicle.getVehicleCode() + " exist already!");
         }
+        if (vehicle.getThrough() == null || vehicle.getThrough().isEmpty()) {
+            throw new InvalidOperationException("Vehicle through points cannot be empty");
+        }
+        if (vehicle.getOrderIds() == null) {
+            vehicle.setOrderIds(new ArrayList<>());
+        }
+        syncVehicleStatusWithOrders(vehicle);
         Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
         logger.info("Vehicle updated");
         return updatedVehicle;
     }
 
-    public ResponseEntity<List<Vehicle>> findIdleVehicle(VehicleType vehicleType, VehicleStatus vehicleStatus, String registeredCity) {
-        logger.info("Entering findIdleVehicle with status " + vehicleStatus + " and vehicleType " + vehicleType);
+    public ResponseEntity<List<Vehicle>> findIdleVehicle(VehicleType vehicleType, VehicleStatus vehicleStatus, String from) {
+        logger.info("Entering findIdleVehicle with status {} and vehicleType {}", vehicleStatus, vehicleType);
         Specification<Vehicle> spec = Specification
                 .where(VehicleSpecification.hasVehicleType(vehicleType))
-                .and(VehicleSpecification.hasVehicleStatus(vehicleStatus))
-                .and(VehicleSpecification.hasRegisteredCity(registeredCity));
-        List<Vehicle> vehicles = vehicleRepositiory.findAll(spec);
+                .and(VehicleSpecification.hasFrom(from));
+        List<Vehicle> vehicles = vehicleRepositiory.findAll(spec)
+                .stream()
+                .filter(vehicle -> matchesRequestedStatus(vehicle, vehicleStatus))
+                .sorted(Comparator.comparing(Vehicle::getVehicleId))
+                .collect(Collectors.toList());
         logger.info("Exiting findIdleVehicleOnType with " + vehicles.size() + " vehicles found");
         return ResponseEntity.ok(vehicles);
+    }
+
+    public ResponseEntity<List<Vehicle>> findVehiclesForOrder(String from, String to, VehicleType vehicleType) {
+        logger.info("Finding vehicles for order from {} to {}", from, to);
+        List<Vehicle> vehicles = vehicleRepositiory.findAll()
+                .stream()
+                .filter(vehicle -> vehicleType == null || vehicle.getVehicleType() == vehicleType)
+                .filter(vehicle -> hasText(vehicle.getFrom()) && vehicle.getFrom().equalsIgnoreCase(from))
+                .filter(vehicle -> vehicle.getVehicleStatus() == VehicleStatus.IDLE || vehicle.getVehicleStatus() == VehicleStatus.OCCUPIED)
+                .filter(vehicle -> routeMatches(vehicle, to))
+                .sorted(Comparator
+                        .comparing((Vehicle vehicle) -> vehicle.getVehicleStatus() == VehicleStatus.IDLE ? 0 : 1)
+                        .thenComparing(this::getOrderCount)
+                        .thenComparing(Vehicle::getVehicleId))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(vehicles);
+    }
+
+    public Vehicle assignOrderToVehicle(Long vehicleId, Long orderId) {
+        logger.info("Assigning order {} to vehicle {}", orderId, vehicleId);
+        Vehicle vehicle = getVehicleById(vehicleId);
+        if (vehicle.getOrderIds() == null) {
+            vehicle.setOrderIds(new ArrayList<>());
+        }
+        if (vehicle.getVehicleStatus() != VehicleStatus.IDLE && vehicle.getVehicleStatus() != VehicleStatus.OCCUPIED) {
+            throw new InvalidOperationException("Orders can only be assigned to IDLE or OCCUPIED vehicles");
+        }
+        if (vehicle.getOrderIds().contains(orderId)) {
+            throw new InvalidOperationException("Order " + orderId + " is already assigned to vehicle " + vehicleId);
+        }
+        vehicle.getOrderIds().add(orderId);
+        if (vehicle.getVehicleStatus() == VehicleStatus.IDLE) {
+            vehicle.setVehicleStatus(VehicleStatus.OCCUPIED);
+        }
+        return vehicleRepositiory.save(vehicle);
+    }
+
+    public Vehicle removeOrderFromVehicle(Long vehicleId, Long orderId) {
+        logger.info("Removing order {} from vehicle {}", orderId, vehicleId);
+        Vehicle vehicle = getVehicleById(vehicleId);
+        if (vehicle.getOrderIds() == null) {
+            vehicle.setOrderIds(new ArrayList<>());
+        }
+        boolean removed = vehicle.getOrderIds().remove(orderId);
+        if (!removed) {
+            throw new InvalidOperationException("Order " + orderId + " is not assigned to vehicle " + vehicleId);
+        }
+        syncVehicleStatusWithOrders(vehicle);
+        return vehicleRepositiory.save(vehicle);
+    }
+
+    public Vehicle updateVehicleStatus(Long vehicleId, VehicleStatus vehicleStatus) {
+        logger.info("Updating vehicle {} status to {}", vehicleId, vehicleStatus);
+        Vehicle vehicle = getVehicleById(vehicleId);
+        if (vehicleStatus != VehicleStatus.IN_TRANSIT && vehicleStatus != VehicleStatus.IDLE) {
+            throw new InvalidOperationException("Vehicle status update only supports IN_TRANSIT or IDLE");
+        }
+        if (vehicle.getOrderIds() == null) {
+            vehicle.setOrderIds(new ArrayList<>());
+        }
+        if (vehicleStatus == VehicleStatus.IN_TRANSIT && vehicle.getOrderIds().isEmpty()) {
+            throw new InvalidOperationException("Vehicle cannot move to IN_TRANSIT without assigned orders");
+        }
+        if (vehicleStatus == VehicleStatus.IDLE && !vehicle.getOrderIds().isEmpty()) {
+            throw new InvalidOperationException("Vehicle cannot move to IDLE while orders are still assigned");
+        }
+        vehicle.setVehicleStatus(vehicleStatus);
+        return vehicleRepositiory.save(vehicle);
     }
 
     public VehicleWithDriverDTO assignDriverToVehicle(Long vehicleId, Long driverId) {
         logger.info("Entering assignDriverToVehicle with vehicleId: {} and driverId: {}", vehicleId, driverId);
         
-        Vehicle vehicle = vehicleRepositiory.findById(vehicleId)
-                .orElseThrow(() -> new VehicleDoesNotExistException("Vehicle with id " + vehicleId + " not found"));
+        Vehicle vehicle = getVehicleById(vehicleId);
         
-        if (vehicle.getVehicleStatus() == VehicleStatus.OCCUPIED) {
-            throw new InvalidOperationException("Vehicle is already occupied. Cannot assign another driver.");
+        if (vehicle.getDriverId() != null) {
+            throw new InvalidOperationException("Vehicle already has a driver assigned.");
+        }
+        if (vehicle.getVehicleStatus() == VehicleStatus.MAINTENANCE || vehicle.getVehicleStatus() == VehicleStatus.DISCARDED) {
+            throw new InvalidOperationException("Driver cannot be assigned to a vehicle in " + vehicle.getVehicleStatus() + " state.");
         }
         
         DriverInfoDTO driverInfo = userServiceClient.getDriverInfo(driverId);
@@ -84,7 +170,6 @@ public class VehicleService {
         }
         
         vehicle.setDriverId(driverId);
-        vehicle.setVehicleStatus(VehicleStatus.OCCUPIED);
         Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
         
         logger.info("Driver assigned to vehicle successfully");
@@ -94,8 +179,7 @@ public class VehicleService {
     public VehicleWithDriverDTO unassignDriverFromVehicle(Long vehicleId) {
         logger.info("Entering unassignDriverFromVehicle with vehicleId: {}", vehicleId);
         
-        Vehicle vehicle = vehicleRepositiory.findById(vehicleId)
-                .orElseThrow(() -> new VehicleDoesNotExistException("Vehicle with id " + vehicleId + " not found"));
+        Vehicle vehicle = getVehicleById(vehicleId);
         
         if (vehicle.getDriverId() == null) {
             throw new InvalidOperationException("No driver is assigned to this vehicle");
@@ -103,7 +187,7 @@ public class VehicleService {
         
         Long driverId = vehicle.getDriverId();
         vehicle.setDriverId(null);
-        vehicle.setVehicleStatus(VehicleStatus.IDLE);
+        syncVehicleStatusWithOrders(vehicle);
         Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
         
         logger.info("Driver unassigned from vehicle successfully");
@@ -115,8 +199,7 @@ public class VehicleService {
     public VehicleWithDriverDTO getVehicleWithDriver(Long vehicleId) {
         logger.info("Entering getVehicleWithDriver with vehicleId: {}", vehicleId);
         
-        Vehicle vehicle = vehicleRepositiory.findById(vehicleId)
-                .orElseThrow(() -> new VehicleDoesNotExistException("Vehicle with id " + vehicleId + " not found"));
+        Vehicle vehicle = getVehicleById(vehicleId);
         
         DriverInfoDTO driverInfo = null;
         if (vehicle.getDriverId() != null) {
@@ -153,7 +236,9 @@ public class VehicleService {
         
         List<VehicleWithDriverDTO> vehiclesWithDrivers = occupiedVehicles.stream()
                 .map(vehicle -> {
-                    DriverInfoDTO driverInfo = userServiceClient.getDriverInfo(vehicle.getDriverId());
+                    DriverInfoDTO driverInfo = vehicle.getDriverId() != null
+                            ? userServiceClient.getDriverInfo(vehicle.getDriverId())
+                            : null;
                     return mapToVehicleWithDriverDTO(vehicle, driverInfo);
                 })
                 .collect(Collectors.toList());
@@ -170,16 +255,8 @@ public class VehicleService {
             throw new DriverNotFoundException("Driver with id " + driverId + " not found");
         }
         
-        List<Vehicle> vehicles = vehicleRepositiory.findAll()
-                .stream()
-                .filter(vehicle -> driverId.equals(vehicle.getDriverId()))
-                .collect(Collectors.toList());
-        
-        if (vehicles.isEmpty()) {
-            throw new InvalidOperationException("Driver with id " + driverId + " is not assigned to any vehicle");
-        }
-        
-        Vehicle vehicle = vehicles.get(0);
+        Vehicle vehicle = vehicleRepositiory.findByDriverId(driverId)
+                .orElseThrow(() -> new InvalidOperationException("Driver with id " + driverId + " is not assigned to any vehicle"));
         logger.info("Current vehicle retrieved successfully for driver {}", driverId);
         return mapToVehicleWithDriverDTO(vehicle, driverInfo);
     }
@@ -190,9 +267,70 @@ public class VehicleService {
                 vehicle.getVehicleName(),
                 vehicle.getVehicleCode(),
                 vehicle.getVehicleType(),
-                vehicle.getRegisteredCity(),
+                vehicle.getFrom(),
+                vehicle.getTo(),
+                copyStringList(vehicle.getThrough()),
+                copyLongList(vehicle.getOrderIds()),
                 vehicle.getVehicleStatus(),
                 driverInfo
         );
+    }
+
+    private Vehicle getVehicleById(Long vehicleId) {
+        return vehicleRepositiory.findById(vehicleId)
+                .orElseThrow(() -> new VehicleDoesNotExistException("Vehicle with id " + vehicleId + " not found"));
+    }
+
+    private boolean matchesRequestedStatus(Vehicle vehicle, VehicleStatus requestedStatus) {
+        if (requestedStatus == null || requestedStatus == VehicleStatus.IDLE || requestedStatus == VehicleStatus.OCCUPIED) {
+            return vehicle.getVehicleStatus() == VehicleStatus.IDLE || vehicle.getVehicleStatus() == VehicleStatus.OCCUPIED;
+        }
+        return vehicle.getVehicleStatus() == requestedStatus;
+    }
+
+    private boolean routeMatches(Vehicle vehicle, String destination) {
+        if (!hasText(destination)) {
+            return false;
+        }
+        if (hasText(vehicle.getTo()) && vehicle.getTo().equalsIgnoreCase(destination)) {
+            return true;
+        }
+        if (vehicle.getThrough() == null) {
+            return false;
+        }
+        return vehicle.getThrough().stream()
+                .filter(this::hasText)
+                .anyMatch(throughPoint -> throughPoint.equalsIgnoreCase(destination));
+    }
+
+    private void syncVehicleStatusWithOrders(Vehicle vehicle) {
+        if (vehicle.getOrderIds() == null) {
+            vehicle.setOrderIds(new ArrayList<>());
+        }
+        if (vehicle.getOrderIds().isEmpty()) {
+            if (vehicle.getVehicleStatus() != VehicleStatus.MAINTENANCE && vehicle.getVehicleStatus() != VehicleStatus.DISCARDED) {
+                vehicle.setVehicleStatus(VehicleStatus.IDLE);
+            }
+            return;
+        }
+        if (vehicle.getVehicleStatus() == null || vehicle.getVehicleStatus() == VehicleStatus.IDLE) {
+            vehicle.setVehicleStatus(VehicleStatus.OCCUPIED);
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private int getOrderCount(Vehicle vehicle) {
+        return vehicle.getOrderIds() == null ? 0 : vehicle.getOrderIds().size();
+    }
+
+    private List<String> copyStringList(List<String> values) {
+        return values == null ? new ArrayList<>() : new ArrayList<>(values);
+    }
+
+    private List<Long> copyLongList(List<Long> values) {
+        return values == null ? new ArrayList<>() : new ArrayList<>(values);
     }
 }

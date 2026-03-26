@@ -40,11 +40,44 @@ public class VehicleController {
 
     @GetMapping("/findIdle")
     public ResponseEntity<List<Vehicle>> findIdleVehicles(
-            @RequestParam VehicleType vehicleType,
-            @RequestParam VehicleStatus vehicleStatus,
-            @RequestParam String registeredCity) {
-        logger.info("Finding idle vehicles with type: {}, status: {}, city: {}", vehicleType, vehicleStatus, registeredCity);
-        return vehicleService.findIdleVehicle(vehicleType, vehicleStatus, registeredCity);
+            @RequestParam(required = false) VehicleType vehicleType,
+            @RequestParam(required = false) VehicleStatus vehicleStatus,
+            @RequestParam String from) {
+        logger.info("Finding assignable vehicles with type: {}, status: {}, from: {}", vehicleType, vehicleStatus, from);
+        return vehicleService.findIdleVehicle(vehicleType, vehicleStatus, from);
+    }
+
+    @GetMapping("/route-match")
+    public ResponseEntity<List<Vehicle>> findVehiclesForOrder(
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam(required = false) VehicleType vehicleType) {
+        logger.info("Finding vehicles for route from {} to {}", from, to);
+        return vehicleService.findVehiclesForOrder(from, to, vehicleType);
+    }
+
+    @PostMapping("/{vehicleId}/orders/{orderId}")
+    public ResponseEntity<Vehicle> assignOrderToVehicle(
+            @PathVariable Long vehicleId,
+            @PathVariable Long orderId) {
+        logger.info("Assigning order {} to vehicle {}", orderId, vehicleId);
+        return ResponseEntity.ok(vehicleService.assignOrderToVehicle(vehicleId, orderId));
+    }
+
+    @DeleteMapping("/{vehicleId}/orders/{orderId}")
+    public ResponseEntity<Vehicle> removeOrderFromVehicle(
+            @PathVariable Long vehicleId,
+            @PathVariable Long orderId) {
+        logger.info("Removing order {} from vehicle {}", orderId, vehicleId);
+        return ResponseEntity.ok(vehicleService.removeOrderFromVehicle(vehicleId, orderId));
+    }
+
+    @PutMapping("/{vehicleId}/status")
+    public ResponseEntity<Vehicle> updateVehicleStatus(
+            @PathVariable Long vehicleId,
+            @RequestParam VehicleStatus vehicleStatus) {
+        logger.info("Updating vehicle {} status to {}", vehicleId, vehicleStatus);
+        return ResponseEntity.ok(vehicleService.updateVehicleStatus(vehicleId, vehicleStatus));
     }
 
     @PostMapping("/assignDriver/{vehicleId}/{driverId}")

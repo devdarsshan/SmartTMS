@@ -5,6 +5,9 @@ import com.smartlogistics.vehicleservice.enums.VehicleStatus;
 import com.smartlogistics.vehicleservice.enums.VehicleType;
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "vehicles")
 public class Vehicle {
@@ -18,9 +21,21 @@ public class Vehicle {
     @Column(nullable = false, unique = true)
     private String vehicleCode;
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private VehicleType vehicleType;
     @Column(nullable = false)
-    private String registeredCity;
+    private String from;
+    @Column(nullable = false)
+    private String to;
+    @ElementCollection
+    @CollectionTable(name = "vehicle_through_points", joinColumns = @JoinColumn(name = "vehicle_id"))
+    @Column(name = "through_point", nullable = false)
+    private List<String> through = new ArrayList<>();
+    @ElementCollection
+    @CollectionTable(name = "vehicle_orders", joinColumns = @JoinColumn(name = "vehicle_id"))
+    @Column(name = "order_id", nullable = false)
+    private List<Long> orderIds = new ArrayList<>();
+    @Enumerated(EnumType.STRING)
     private VehicleStatus vehicleStatus = VehicleStatus.IDLE;
 
     public Long getVehicleId() {
@@ -63,12 +78,36 @@ public class Vehicle {
         this.vehicleType = vehicleType;
     }
 
-    public String getRegisteredCity() {
-        return registeredCity;
+    public String getFrom() {
+        return from;
     }
 
-    public void setRegisteredCity(String registeredCity) {
-        this.registeredCity = registeredCity;
+    public void setFrom(String from) {
+        this.from = from;
+    }
+
+    public String getTo() {
+        return to;
+    }
+
+    public void setTo(String to) {
+        this.to = to;
+    }
+
+    public List<String> getThrough() {
+        return through;
+    }
+
+    public void setThrough(List<String> through) {
+        this.through = through;
+    }
+
+    public List<Long> getOrderIds() {
+        return orderIds;
+    }
+
+    public void setOrderIds(List<Long> orderIds) {
+        this.orderIds = orderIds;
     }
 
     public VehicleStatus getVehicleStatus() {

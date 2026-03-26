@@ -14,15 +14,15 @@ import java.util.List;
 
 @RestController()
 @RequestMapping(path = "/user")
-public class ProfileController {
+public class UserController {
 
     public ProfileService profileService;
 
-    public ProfileController(ProfileService profileService) {
+    public UserController(ProfileService profileService) {
         this.profileService = profileService;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(ProfileController.class);
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
     @PostMapping(path = "/createProfile")
     public ResponseEntity<Void> createUserProfile(@Valid @RequestBody CreateProfileRequest request) {
         log.info("Entering CreateUserProfile Controller");

@@ -1,15 +1,14 @@
-package com.smartlogistics.vehicleservice.client;
+package com.smartlogistics.order.client;
 
-import com.smartlogistics.vehicleservice.dto.DriverInfoDTO;
+import com.smartlogistics.order.dto.UserProfileDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(name = "user-service", url = "http://localhost:7086")
+@FeignClient(name = "user-service-order-client", url = "http://localhost:7086")
 public interface UserServiceFeignClient {
 
     @GetMapping("/user/fetchProfile/{authUserId}")
-    ResponseEntity<DriverInfoDTO> getDriverInfo(@PathVariable("authUserId") Long authUserId);
+    ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable("authUserId") Long authUserId);
 }
-

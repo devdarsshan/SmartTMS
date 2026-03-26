@@ -9,4 +9,6 @@ import java.util.Optional;
 public interface VehicleRepositiory extends JpaRepository<Vehicle, Long>, JpaSpecificationExecutor<Vehicle> {
 
     Optional<Vehicle> findByVehicleCode(String vehicleCode);
+
+    Optional<Vehicle> findByDriverId(Long driverId);
 }
