@@ -5,7 +5,6 @@ import com.smartlogistics.userservice.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 
 public class CreateProfileRequest {
 
@@ -18,8 +17,7 @@ public class CreateProfileRequest {
     private String firstName;
     private String lastName;
     private String phoneNumber;
-    @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(ADMIN|USER|DRIVER|DISPATCHER)$", message = "Role must be one of: ADMIN, USER, DRIVER, DISPATCHER")
+    @NotNull(message = "Role is required")
     private UserRole userRole;
     private String city;
     private DriverStatus driverStatus = DriverStatus.ACTIVE;

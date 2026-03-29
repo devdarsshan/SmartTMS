@@ -13,7 +13,7 @@ public class AuditService {
 
     public void logRegistration(String username, boolean success, String reason) {
         String message = String.format(
-                "[AUDIT] Registration | Username: %s | Email: %s | Success: %s | Reason: %s | Timestamp: %s",
+                "[AUDIT] Registration | Username: %s | Success: %s | Reason: %s | Timestamp: %s",
                 username, success, reason, LocalDateTime.now().format(formatter)
         );
         if (success) {

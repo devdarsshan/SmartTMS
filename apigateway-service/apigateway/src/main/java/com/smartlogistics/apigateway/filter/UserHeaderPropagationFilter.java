@@ -3,14 +3,11 @@ package com.smartlogistics.apigateway.filter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-
-import java.util.function.Consumer;
 
 @Component
 public class UserHeaderPropagationFilter implements GlobalFilter, Ordered {
@@ -19,17 +16,25 @@ public class UserHeaderPropagationFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         return ReactiveSecurityContextHolder.getContext()
-                .map(ctx->ctx.getAuthentication())
+                .map(ctx -> ctx.getAuthentication())
                 .cast(JwtAuthenticationToken.class)
-                .flatMap(auth->{
+                .flatMap(auth -> {
                     String username = auth.getToken().getSubject();
-                    String userId = auth.getToken().getClaim("userId");
-                    ServerHttpRequest mutatedRequest = (ServerHttpRequest) exchange.getRequest()
-                            .mutate()
-                            .header("X-User-Name", username)
-                            .header("X-User-Id", userId)
+                    Object userIdClaim = auth.getToken().getClaims().get("userId");
+                    String userId = userIdClaim == null ? null : userIdClaim.toString();
+
+                    ServerWebExchange mutatedExchange = exchange.mutate()
+                            .request(builder -> {
+                                builder.headers(headers -> {
+                                    headers.set("X-User-Name", username);
+                                    if (userId != null && !userId.isBlank()) {
+                                        headers.set("X-User-Id", userId);
+                                    }
+                                });
+                            })
                             .build();
-                    return chain.filter(exchange.mutate().request((Consumer<org.springframework.http.server.reactive.ServerHttpRequest.Builder>) mutatedRequest).build());
+
+                    return chain.filter(mutatedExchange);
                 })
                 .switchIfEmpty(chain.filter(exchange));
     }

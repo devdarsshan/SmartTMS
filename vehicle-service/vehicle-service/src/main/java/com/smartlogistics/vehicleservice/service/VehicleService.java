@@ -154,24 +154,34 @@ public class VehicleService {
 
     public VehicleWithDriverDTO assignDriverToVehicle(Long vehicleId, Long driverId) {
         logger.info("Entering assignDriverToVehicle with vehicleId: {} and driverId: {}", vehicleId, driverId);
-        
+
         Vehicle vehicle = getVehicleById(vehicleId);
-        
+
         if (vehicle.getDriverId() != null) {
             throw new InvalidOperationException("Vehicle already has a driver assigned.");
         }
         if (vehicle.getVehicleStatus() == VehicleStatus.MAINTENANCE || vehicle.getVehicleStatus() == VehicleStatus.DISCARDED) {
             throw new InvalidOperationException("Driver cannot be assigned to a vehicle in " + vehicle.getVehicleStatus() + " state.");
         }
-        
+
         DriverInfoDTO driverInfo = userServiceClient.getDriverInfo(driverId);
         if (driverInfo == null) {
             throw new DriverNotFoundException("Driver with id " + driverId + " not found");
         }
-        
+        if (driverInfo.getUserRole() == null || !driverInfo.getUserRole().equalsIgnoreCase("DRIVER")) {
+            throw new InvalidOperationException("User with id " + driverId + " is not eligible to be assigned as a driver");
+        }
+        vehicleRepositiory.findByDriverId(driverId)
+                .filter(existingVehicle -> !existingVehicle.getVehicleId().equals(vehicleId))
+                .ifPresent(existingVehicle -> {
+                    throw new DriverNotAvailableException(
+                            "Driver with id " + driverId + " is already assigned to vehicle " + existingVehicle.getVehicleId()
+                    );
+                });
+
         vehicle.setDriverId(driverId);
         Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
-        
+
         logger.info("Driver assigned to vehicle successfully");
         return mapToVehicleWithDriverDTO(updatedVehicle, driverInfo);
     }
