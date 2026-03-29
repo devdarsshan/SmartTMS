@@ -27,7 +27,7 @@ public class UserHeaderPropagationFilter implements GlobalFilter, Ordered {
                             .request(builder -> {
                                 builder.headers(headers -> {
                                     headers.set("X-User-Name", username);
-                                    if (userId != null && !userId.isBlank()) {
+                                    if (userId != null && !userId.isEmpty()) {
                                         headers.set("X-User-Id", userId);
                                     }
                                 });

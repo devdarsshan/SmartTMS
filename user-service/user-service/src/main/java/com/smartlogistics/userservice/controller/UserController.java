@@ -24,9 +24,11 @@ public class UserController {
 
     private static final Logger log = LoggerFactory.getLogger(UserController.class);
     @PostMapping(path = "/createProfile")
-    public ResponseEntity<Void> createUserProfile(@Valid @RequestBody CreateProfileRequest request) {
+    public ResponseEntity<Void> createUserProfile(
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @Valid @RequestBody CreateProfileRequest request) {
         log.info("Entering CreateUserProfile Controller");
-        profileService.createUserProfile(request);
+        profileService.createUserProfile(userIdHeader, request);
         return ResponseEntity.ok().build();
     }
 

@@ -39,7 +39,7 @@ public class RateLimitingFilter implements GlobalFilter, Ordered {
                     String.valueOf(probe.getRemainingTokens()));
             return chain.filter(exchange);
         } else {
-            long waitForRefill = probe.getRoundedSecondsToWait();
+            long waitForRefill = probe.getNanosToWaitForRefill();
             ServerHttpResponse response = exchange.getResponse();
             response.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
             response.getHeaders().add("Retry-After", String.valueOf(waitForRefill));

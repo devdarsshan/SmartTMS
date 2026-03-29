@@ -8,8 +8,6 @@ import jakarta.validation.constraints.NotNull;
 
 public class CreateProfileRequest {
 
-    @NotNull(message = "User Id is required")
-    private Long authUserId;
     @NotBlank(message = "Email is required")
     @Email
     private String email;
@@ -28,14 +26,6 @@ public class CreateProfileRequest {
 
     public void setCity(String city) {
         this.city = city;
-    }
-
-    public Long getAuthUserId() {
-        return authUserId;
-    }
-
-    public void setAuthUserId(Long authUserId) {
-        this.authUserId = authUserId;
     }
 
     public String getEmail() {

@@ -22,13 +22,14 @@ public class ProfileService {
         this.userProfileRepo = userProfileRepo;
     }
 
-    public void createUserProfile(CreateProfileRequest request) {
+    public void createUserProfile(String userIdHeader, CreateProfileRequest request) {
         logger.info("createUserProfile");
-        if (userProfileRepo.findByAuthUserid(request.getAuthUserId()).isPresent()) {
+        Long authUserId = parseAuthUserId(userIdHeader);
+        if (userProfileRepo.findByAuthUserId(authUserId).isPresent()) {
             throw new ProfileAlreadyExistsException("User profile already exists");
         }
         UserProfile userProfile = new UserProfile();
-        userProfile.setAuthUserId(request.getAuthUserId());
+        userProfile.setAuthUserId(authUserId);
         userProfile.setEmail(request.getEmail());
         userProfile.setFirstName(request.getFirstName());
         userProfile.setLastName(request.getLastName());
@@ -42,7 +43,7 @@ public class ProfileService {
     public void updateUserProfile(Long authUserId, UpdateProfileRequest request) {
         logger.info("updateUserProfile");
         UserProfile userProfile = userProfileRepo
-                .findByAuthUserid(authUserId)
+                .findByAuthUserId(authUserId)
                 .orElseThrow(() -> new UserprofileNotFoundException("User not found"));
 
         if (request.getEmail() != null) {
@@ -75,7 +76,7 @@ public class ProfileService {
 
     public ResponseEntity<UserProfile> fetchUserProfile(Long authUserId) {
         logger.info("fetchUserProfile");
-        UserProfile userProfile =  userProfileRepo.findByAuthUserid(authUserId)
+        UserProfile userProfile =  userProfileRepo.findByAuthUserId(authUserId)
                     .orElseThrow(() -> new UserprofileNotFoundException("User not found"));
         return ResponseEntity.ok().body(userProfile);
     }
@@ -85,5 +86,16 @@ public class ProfileService {
         List<UserProfile> userProfiles = userProfileRepo.findByUserRole(userRole);
         logger.info("{} users with role {} found",userProfiles.size(), userRole);
         return ResponseEntity.ok().body(userProfiles);
+    }
+
+    private Long parseAuthUserId(String userIdHeader) {
+        if (userIdHeader == null || userIdHeader.trim().isEmpty()) {
+            throw new IllegalArgumentException("X-User-Id header is required");
+        }
+        try {
+            return Long.parseLong(userIdHeader);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("X-User-Id header must be a valid number");
+        }
     }
 }
