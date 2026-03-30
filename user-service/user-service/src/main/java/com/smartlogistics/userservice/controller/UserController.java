@@ -34,7 +34,7 @@ public class UserController {
 
     @PutMapping("/updateProfile/{authUserId}")
     public ResponseEntity<Void> updateUserProfile(
-            @PathVariable Long authUserId,
+            @PathVariable("authUserId") Long authUserId,
             @RequestBody UpdateProfileRequest request) {
         log.info("Entering UpdateUserProfile Controller");
         request.setAuthUserId(authUserId);
@@ -44,14 +44,14 @@ public class UserController {
 
     @GetMapping(path = "/fetchProfile/{authUserId}")
     public ResponseEntity<UserProfile> fetchUserProfile(
-            @PathVariable Long authUserId) {
+            @PathVariable("authUserId") Long authUserId) {
         log.info("Entering FetchUserProfile Controller");
         return profileService.fetchUserProfile(authUserId);
     }
 
     @GetMapping(path = "/fetchProfilesByRole/{role}")
     public ResponseEntity<List<UserProfile>> fetchUserProfilesByRoles(
-            @PathVariable String role) {
+            @PathVariable("role") String role) {
         log.info("Entering FetchUserProfilesByRoles Controller");
         return profileService.fetchUserProfilesByRoles(role);
     }

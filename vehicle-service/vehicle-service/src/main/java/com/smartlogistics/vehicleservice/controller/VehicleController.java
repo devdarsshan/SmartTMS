@@ -58,23 +58,23 @@ public class VehicleController {
 
     @PostMapping("/{vehicleId}/orders/{orderId}")
     public ResponseEntity<Vehicle> assignOrderToVehicle(
-            @PathVariable Long vehicleId,
-            @PathVariable Long orderId) {
+            @PathVariable("vehicleId") Long vehicleId,
+            @PathVariable("orderId") Long orderId) {
         logger.info("Assigning order {} to vehicle {}", orderId, vehicleId);
         return ResponseEntity.ok(vehicleService.assignOrderToVehicle(vehicleId, orderId));
     }
 
     @DeleteMapping("/{vehicleId}/orders/{orderId}")
     public ResponseEntity<Vehicle> removeOrderFromVehicle(
-            @PathVariable Long vehicleId,
-            @PathVariable Long orderId) {
+            @PathVariable("vehicleId") Long vehicleId,
+            @PathVariable("orderId") Long orderId) {
         logger.info("Removing order {} from vehicle {}", orderId, vehicleId);
         return ResponseEntity.ok(vehicleService.removeOrderFromVehicle(vehicleId, orderId));
     }
 
     @PutMapping("/{vehicleId}/status")
     public ResponseEntity<Vehicle> updateVehicleStatus(
-            @PathVariable Long vehicleId,
+            @PathVariable("vehicleId") Long vehicleId,
             @RequestParam VehicleStatus vehicleStatus) {
         logger.info("Updating vehicle {} status to {}", vehicleId, vehicleStatus);
         return ResponseEntity.ok(vehicleService.updateVehicleStatus(vehicleId, vehicleStatus));
@@ -82,22 +82,22 @@ public class VehicleController {
 
     @PostMapping("/assignDriver/{vehicleId}/{driverId}")
     public ResponseEntity<VehicleWithDriverDTO> assignDriver(
-            @PathVariable Long vehicleId,
-            @PathVariable Long driverId) {
+            @PathVariable("vehicleId") Long vehicleId,
+            @PathVariable("driverId") Long driverId) {
         logger.info("Assigning driver {} to vehicle {}", driverId, vehicleId);
         VehicleWithDriverDTO result = vehicleService.assignDriverToVehicle(vehicleId, driverId);
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/unassignDriver/{vehicleId}")
-    public ResponseEntity<VehicleWithDriverDTO> unassignDriver(@PathVariable Long vehicleId) {
+    public ResponseEntity<VehicleWithDriverDTO> unassignDriver(@PathVariable("vehicleId") Long vehicleId) {
         logger.info("Unassigning driver from vehicle {}", vehicleId);
         VehicleWithDriverDTO result = vehicleService.unassignDriverFromVehicle(vehicleId);
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/{vehicleId}")
-    public ResponseEntity<VehicleWithDriverDTO> getVehicleWithDriver(@PathVariable Long vehicleId) {
+    public ResponseEntity<VehicleWithDriverDTO> getVehicleWithDriver(@PathVariable("vehicleId") Long vehicleId) {
         logger.info("Fetching vehicle {} with driver info", vehicleId);
         VehicleWithDriverDTO result = vehicleService.getVehicleWithDriver(vehicleId);
         return ResponseEntity.ok(result);
@@ -116,7 +116,7 @@ public class VehicleController {
     }
 
     @GetMapping("/driver/{driverId}/currentVehicle")
-    public ResponseEntity<VehicleWithDriverDTO> getDriverCurrentVehicle(@PathVariable Long driverId) {
+    public ResponseEntity<VehicleWithDriverDTO> getDriverCurrentVehicle(@PathVariable("driverId") Long driverId) {
         logger.info("Fetching current vehicle for driver {}", driverId);
         VehicleWithDriverDTO result = vehicleService.getDriverCurrentVehicle(driverId);
         return ResponseEntity.ok(result);

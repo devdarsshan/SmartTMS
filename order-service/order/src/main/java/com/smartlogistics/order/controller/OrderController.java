@@ -31,20 +31,20 @@ public class OrderController {
     }
 
     @PostMapping("/{orderId}/assign")
-    public ResponseEntity<Order> assignOrder(@PathVariable Long orderId) {
+    public ResponseEntity<Order> assignOrder(@PathVariable("orderId") Long orderId) {
         logger.info("Assigning vehicle to order {}", orderId);
         return ResponseEntity.ok(orderService.assignOrder(orderId));
     }
 
     @PutMapping("/{orderId}/status")
-    public ResponseEntity<Order> updateOrderStatus(@PathVariable Long orderId,
+    public ResponseEntity<Order> updateOrderStatus(@PathVariable("orderId") Long orderId,
                                                    @Valid @RequestBody UpdateOrderStatusRequest request) {
         logger.info("Updating order {} status to {}", orderId, request.getStatus());
         return ResponseEntity.ok(orderService.updateOrderStatus(orderId, request));
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<Order> fetchOrder(@PathVariable Long orderId) {
+    public ResponseEntity<Order> fetchOrder(@PathVariable("orderId") Long orderId) {
         logger.info("Fetching order {}", orderId);
         return orderService.fetchOrder(orderId);
     }
