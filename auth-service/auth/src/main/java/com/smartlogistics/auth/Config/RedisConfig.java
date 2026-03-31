@@ -1,4 +1,4 @@
-package com.smartlogistics.auth.config;
+package com.smartlogistics.auth.Config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;

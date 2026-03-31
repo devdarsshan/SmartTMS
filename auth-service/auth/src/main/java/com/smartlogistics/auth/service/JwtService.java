@@ -9,7 +9,6 @@ import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -21,8 +20,9 @@ import java.util.concurrent.TimeUnit;
 public class JwtService {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
-    private static final String JWT_BLACKLIST_PREFIX = "auth:blacklist:";
-    private static final String JWT_CACHE_PREFIX = "auth:jwt:";
+    private static final String JWT_BLACKLIST_PREFIX = "auth:jwt:blacklist:";
+    private static final String JWT_VALIDATION_CACHE_PREFIX = "auth:jwt:valid:";
+    private static final long TOKEN_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -34,29 +34,40 @@ public class JwtService {
     }
 
     public String generateToken(User user) {
-        String jti = String.valueOf(System.currentTimeMillis()); // JWT ID for blacklisting
+        long currentTimeMs = System.currentTimeMillis();
+        String jti = user.getUsername() + "-" + currentTimeMs; // JWT ID for blacklisting
+        
         String token = Jwts.builder()
                 .setSubject(user.getUsername())
                 .claim("userId", user.getUserId())
                 .claim("jti", jti)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24)) // 24 hours
+                .setIssuedAt(new Date(currentTimeMs))
+                .setExpiration(new Date(currentTimeMs + TOKEN_EXPIRATION_MS))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
 
-        // Cache the valid token for 24 hours
-        cacheValidToken(token, 24 * 60 * 60);
+        // Cache the valid token for 24 hours to speed up validation
+        cacheValidToken(jti, TOKEN_EXPIRATION_MS / 1000);
+        
         logger.info("Generated JWT token for user: {}", user.getUsername());
         return token;
     }
 
-    @Cacheable(value = "jwtUsername", key = "#token", unless = "#result == null")
+    /**
+     * Extract username from token.
+     * Note: Always check token validity with isTokenValid() before trusting the extracted username.
+     */
     public String extractUsername(String token) {
-        if (isTokenBlacklisted(token)) {
-            logger.warn("Attempted to extract username from blacklisted token");
+        try {
+            if (isTokenBlacklisted(token)) {
+                logger.warn("Attempted to extract username from blacklisted token");
+                return null;
+            }
+            return getClaimsFromToken(token).getSubject();
+        } catch (Exception e) {
+            logger.error("Error extracting username from token: {}", e.getMessage());
             return null;
         }
-        return getClaimsFromToken(token).getSubject();
     }
 
     public boolean isTokenValid(String token) {
@@ -66,22 +77,26 @@ public class JwtService {
                 return false;
             }
 
-            // Check if token is cached as valid
-            String cacheKey = JWT_CACHE_PREFIX + token.hashCode();
-            if (Boolean.TRUE.equals(redisTemplate.hasKey(cacheKey))) {
-                logger.debug("Token validation from cache: valid");
-                return true;
+            Claims claims = getClaimsFromToken(token);
+            String jti = claims.get("jti", String.class);
+            
+            // Check if token's jti is cached as valid
+            if (jti != null) {
+                String cacheKey = JWT_VALIDATION_CACHE_PREFIX + jti;
+                if (Boolean.TRUE.equals(redisTemplate.hasKey(cacheKey))) {
+                    logger.debug("Token validation from cache: valid");
+                    return true;
+                }
             }
 
-            // Validate token and cache result
-            Claims claims = getClaimsFromToken(token);
+            // Validate token expiration
             boolean isValid = !claims.getExpiration().before(new Date());
             
-            if (isValid) {
-                // Cache valid token for remaining time
+            if (isValid && jti != null) {
+                // Cache valid token using jti for remaining time
                 long expirationTime = claims.getExpiration().getTime() - System.currentTimeMillis();
                 if (expirationTime > 0) {
-                    cacheValidToken(token, expirationTime / 1000);
+                    cacheValidToken(jti, expirationTime / 1000);
                 }
             }
             
@@ -106,9 +121,9 @@ public class JwtService {
                     redisTemplate.opsForValue().set(blacklistKey, true, expirationTime, TimeUnit.MILLISECONDS);
                     
                     // Remove from valid token cache
-                    String cacheKey = JWT_CACHE_PREFIX + token.hashCode();
-                    redisTemplate.delete(cacheKey);
-                    
+                    String validationCacheKey = JWT_VALIDATION_CACHE_PREFIX + jti;
+                    redisTemplate.delete(validationCacheKey);
+
                     logger.info("Token blacklisted with JTI: {}", jti);
                 }
             }
@@ -137,11 +152,11 @@ public class JwtService {
         }
     }
 
-    private void cacheValidToken(String token, long ttlSeconds) {
+    private void cacheValidToken(String jti, long ttlSeconds) {
         try {
-            String cacheKey = JWT_CACHE_PREFIX + token.hashCode();
+            String cacheKey = JWT_VALIDATION_CACHE_PREFIX + jti;
             redisTemplate.opsForValue().set(cacheKey, true, ttlSeconds, TimeUnit.SECONDS);
-            logger.debug("Cached valid token for {} seconds", ttlSeconds);
+            logger.debug("Cached valid token with JTI {} for {} seconds", jti, ttlSeconds);
         } catch (Exception e) {
             logger.error("Error caching valid token: {}", e.getMessage());
         }

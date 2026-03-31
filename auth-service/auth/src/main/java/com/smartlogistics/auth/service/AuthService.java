@@ -24,8 +24,9 @@ import java.util.concurrent.TimeUnit;
 public class AuthService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
-    private static final String USER_CACHE_PREFIX = "auth:user:";
     private static final String RATE_LIMIT_PREFIX = "auth:rate_limit:";
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final int RATE_LIMIT_DURATION_MINUTES = 1;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -44,23 +45,18 @@ public class AuthService {
     }
 
     public void register(RegisterRequest request) {
-        // Check if user already exists
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            auditService.logRegistration(request.getUsername(),false, "User already exists");
+            auditService.logRegistration(request.getUsername(), false, "User already exists");
             throw new UserAlreadyExistsException("Username already exists: " + request.getUsername());
         }
 
-        // Create new user
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         
-        User savedUser = userRepository.save(user);
+        userRepository.save(user);
         
-        // Cache the user for quick access
-        cacheUser(savedUser);
-        
-        auditService.logRegistration(request.getUsername(),true, "User registered successfully");
+        auditService.logRegistration(request.getUsername(), true, "User registered successfully");
         logger.info("User registered successfully: {}", request.getUsername());
     }
 
@@ -73,18 +69,12 @@ public class AuthService {
             throw new UnauthorizedException("Rate limit exceeded. Please try again later.");
         }
         
-        // Try to get user from cache first
-        User user = getCachedUser(request.getUsername());
-        if (user == null) {
-            user = userRepository.findByUsername(request.getUsername())
-                    .orElseThrow(() -> {
-                        recordFailedLoginAttempt(clientIp);
-                        auditService.logFailedLoginAttempt(request.getUsername(), clientIp);
-                        return new UnauthorizedException("Invalid username or password");
-                    });
-            // Cache the user for future lookups
-            cacheUser(user);
-        }
+        User user = getUserByUsername(request.getUsername())
+                .orElseThrow(() -> {
+                    recordFailedLoginAttempt(clientIp);
+                    auditService.logFailedLoginAttempt(request.getUsername(), clientIp);
+                    return new UnauthorizedException("Invalid username or password");
+                });
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             recordFailedLoginAttempt(clientIp);
@@ -102,32 +92,23 @@ public class AuthService {
         return new AuthResponse(token, user.getUserId());
     }
 
-    @Cacheable(value = "userByUsername", key = "#username", unless = "#result == null")
-    public User getCachedUser(String username) {
-        logger.debug("Attempting to retrieve user from cache: {}", username);
-        return null; // Spring will handle caching, this is just for cache miss logging
+
+    @Cacheable(value = "userByUsername", key = "#username", unless = "#result == null || !#result.isPresent()")
+    public java.util.Optional<User> getUserByUsername(String username) {
+        logger.debug("Fetching user from database: {}", username);
+        return userRepository.findByUsername(username);
     }
 
-    @CacheEvict(value = "userByUsername", key = "#user.username")
-    public void evictUserCache(User user) {
-        logger.debug("Evicted user from cache: {}", user.getUsername());
-    }
-
-    private void cacheUser(User user) {
-        try {
-            String cacheKey = USER_CACHE_PREFIX + user.getUsername();
-            redisTemplate.opsForValue().set(cacheKey, user, 1, TimeUnit.HOURS);
-            logger.debug("Cached user: {}", user.getUsername());
-        } catch (Exception e) {
-            logger.error("Error caching user: {}", e.getMessage());
-        }
+    @CacheEvict(value = "userByUsername", key = "#username")
+    public void evictUserCache(String username) {
+        logger.debug("Evicted user from cache: {}", username);
     }
 
     private boolean isRateLimited(String clientIp) {
         try {
             String rateLimitKey = RATE_LIMIT_PREFIX + clientIp;
             Integer attempts = (Integer) redisTemplate.opsForValue().get(rateLimitKey);
-            boolean limited = attempts != null && attempts >= 5; // Max 5 attempts per minute
+            boolean limited = attempts != null && attempts >= MAX_LOGIN_ATTEMPTS;
             
             if (limited) {
                 logger.warn("Rate limit exceeded for IP: {}", clientIp);
@@ -146,7 +127,7 @@ public class AuthService {
             Integer attempts = (Integer) redisTemplate.opsForValue().get(rateLimitKey);
             attempts = (attempts == null) ? 1 : attempts + 1;
             
-            redisTemplate.opsForValue().set(rateLimitKey, attempts, 1, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(rateLimitKey, attempts, RATE_LIMIT_DURATION_MINUTES, TimeUnit.MINUTES);
             logger.debug("Recorded failed login attempt for IP: {} (attempt: {})", clientIp, attempts);
         } catch (Exception e) {
             logger.error("Error recording failed login attempt: {}", e.getMessage());
