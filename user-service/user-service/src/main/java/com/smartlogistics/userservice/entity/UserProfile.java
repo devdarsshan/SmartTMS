@@ -2,10 +2,13 @@ package com.smartlogistics.userservice.entity;
 
 
 import jakarta.persistence.*;
+import java.io.Serializable;
 
 @Entity
 @Table(name ="user")
-public class UserProfile {
+public class UserProfile implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -83,5 +86,19 @@ public class UserProfile {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    @Override
+    public String toString() {
+        return "UserProfile{" +
+                "userProfileId=" + userProfileId +
+                ", authUserId=" + authUserId +
+                ", email='" + email + '\'' +
+                ", firstName='" + firstName + '\'' +
+                ", lastName='" + lastName + '\'' +
+                ", userRole='" + userRole + '\'' +
+                ", phoneNumber='" + phoneNumber + '\'' +
+                ", city='" + city + '\'' +
+                '}';
     }
 }
