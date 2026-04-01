@@ -9,45 +9,30 @@ import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
 import java.util.Date;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class JwtService {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
-    private static final String JWT_BLACKLIST_PREFIX = "auth:jwt:blacklist:";
-    private static final String JWT_VALIDATION_CACHE_PREFIX = "auth:jwt:valid:";
     private static final long TOKEN_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
     @Value("${jwt.secret}")
     private String secretKey;
 
-    private final RedisTemplate<String, Object> redisTemplate;
-
-    public JwtService(RedisTemplate<String, Object> redisTemplate) {
-        this.redisTemplate = redisTemplate;
-    }
-
     public String generateToken(User user) {
         long currentTimeMs = System.currentTimeMillis();
-        String jti = user.getUsername() + "-" + currentTimeMs; // JWT ID for blacklisting
         
         String token = Jwts.builder()
                 .setSubject(user.getUsername())
                 .claim("userId", user.getUserId())
-                .claim("jti", jti)
                 .setIssuedAt(new Date(currentTimeMs))
                 .setExpiration(new Date(currentTimeMs + TOKEN_EXPIRATION_MS))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
-
-        // Cache the valid token for 24 hours to speed up validation
-        cacheValidToken(jti, TOKEN_EXPIRATION_MS / 1000);
         
         logger.info("Generated JWT token for user: {}", user.getUsername());
         return token;
@@ -59,10 +44,6 @@ public class JwtService {
      */
     public String extractUsername(String token) {
         try {
-            if (isTokenBlacklisted(token)) {
-                logger.warn("Attempted to extract username from blacklisted token");
-                return null;
-            }
             return getClaimsFromToken(token).getSubject();
         } catch (Exception e) {
             logger.error("Error extracting username from token: {}", e.getMessage());
@@ -72,93 +53,15 @@ public class JwtService {
 
     public boolean isTokenValid(String token) {
         try {
-            if (isTokenBlacklisted(token)) {
-                logger.warn("Token validation failed: token is blacklisted");
-                return false;
-            }
-
             Claims claims = getClaimsFromToken(token);
-            String jti = claims.get("jti", String.class);
-            
-            // Check if token's jti is cached as valid
-            if (jti != null) {
-                String cacheKey = JWT_VALIDATION_CACHE_PREFIX + jti;
-                if (Boolean.TRUE.equals(redisTemplate.hasKey(cacheKey))) {
-                    logger.debug("Token validation from cache: valid");
-                    return true;
-                }
-            }
-
             // Validate token expiration
             boolean isValid = !claims.getExpiration().before(new Date());
-            
-            if (isValid && jti != null) {
-                // Cache valid token using jti for remaining time
-                long expirationTime = claims.getExpiration().getTime() - System.currentTimeMillis();
-                if (expirationTime > 0) {
-                    cacheValidToken(jti, expirationTime / 1000);
-                }
-            }
             
             logger.debug("Token validation result: {}", isValid);
             return isValid;
         } catch (Exception e) {
             logger.error("Token validation error: {}", e.getMessage());
             return false;
-        }
-    }
-
-    public void blacklistToken(String token) {
-        try {
-            Claims claims = getClaimsFromToken(token);
-            String jti = claims.get("jti", String.class);
-            
-            if (jti != null) {
-                // Calculate remaining time until expiration
-                long expirationTime = claims.getExpiration().getTime() - System.currentTimeMillis();
-                if (expirationTime > 0) {
-                    String blacklistKey = JWT_BLACKLIST_PREFIX + jti;
-                    redisTemplate.opsForValue().set(blacklistKey, true, expirationTime, TimeUnit.MILLISECONDS);
-                    
-                    // Remove from valid token cache
-                    String validationCacheKey = JWT_VALIDATION_CACHE_PREFIX + jti;
-                    redisTemplate.delete(validationCacheKey);
-
-                    logger.info("Token blacklisted with JTI: {}", jti);
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Error blacklisting token: {}", e.getMessage());
-        }
-    }
-
-    private boolean isTokenBlacklisted(String token) {
-        try {
-            Claims claims = getClaimsFromToken(token);
-            String jti = claims.get("jti", String.class);
-            
-            if (jti != null) {
-                String blacklistKey = JWT_BLACKLIST_PREFIX + jti;
-                boolean isBlacklisted = Boolean.TRUE.equals(redisTemplate.hasKey(blacklistKey));
-                if (isBlacklisted) {
-                    logger.debug("Token with JTI {} is blacklisted", jti);
-                }
-                return isBlacklisted;
-            }
-            return false;
-        } catch (Exception e) {
-            logger.error("Error checking token blacklist: {}", e.getMessage());
-            return true; // Assume blacklisted if we can't verify
-        }
-    }
-
-    private void cacheValidToken(String jti, long ttlSeconds) {
-        try {
-            String cacheKey = JWT_VALIDATION_CACHE_PREFIX + jti;
-            redisTemplate.opsForValue().set(cacheKey, true, ttlSeconds, TimeUnit.SECONDS);
-            logger.debug("Cached valid token with JTI {} for {} seconds", jti, ttlSeconds);
-        } catch (Exception e) {
-            logger.error("Error caching valid token: {}", e.getMessage());
         }
     }
 

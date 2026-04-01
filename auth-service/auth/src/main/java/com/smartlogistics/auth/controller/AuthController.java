@@ -46,7 +46,6 @@ public class AuthController {
         
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            jwtService.blacklistToken(token);
             logger.info("User logged out, token blacklisted");
             return ResponseEntity.ok().build();
         }
