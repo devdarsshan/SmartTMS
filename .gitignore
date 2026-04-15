@@ -40,3 +40,6 @@ cmake-build-*/
 
 # IntelliJ build output
 out/
+
+### Env (secrets)
+.env.redis

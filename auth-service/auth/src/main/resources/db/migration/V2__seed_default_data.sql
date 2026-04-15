@@ -1,0 +1,70 @@
+INSERT INTO `auth` (`user_id`, `username`, `password`) VALUES
+(1, 'admin.core', '$2a$10$8sdWW1xNrCht2Hbucpf1r.yaEUqebTZNGWcI3Y.bV.fv5.qSgR1Za'),
+(2, 'dispatch.mumbai', '$2a$10$k3PSFUrPu/EqaohJbuE1fevLhmPNUlr5YqTveprpvV/Cp1D4r4vo.'),
+(3, 'dispatch.bengaluru', '$2a$10$k3PSFUrPu/EqaohJbuE1fevLhmPNUlr5YqTveprpvV/Cp1D4r4vo.'),
+(4, 'driver.arjun', '$2a$10$bZnGIGIw7.wwCeo11XXTF.OjYw0XxGtwsHZIIWnPRheuuOr4istse'),
+(5, 'driver.meera', '$2a$10$bZnGIGIw7.wwCeo11XXTF.OjYw0XxGtwsHZIIWnPRheuuOr4istse'),
+(6, 'driver.ravi', '$2a$10$bZnGIGIw7.wwCeo11XXTF.OjYw0XxGtwsHZIIWnPRheuuOr4istse'),
+(7, 'driver.sonal', '$2a$10$bZnGIGIw7.wwCeo11XXTF.OjYw0XxGtwsHZIIWnPRheuuOr4istse'),
+(8, 'customer.acme', '$2a$10$NWBTrQH8yirDalmecWGseuFH.ss3TliivJjLDIy6Ko/u21Hk5MeFu'),
+(9, 'customer.retail', '$2a$10$NWBTrQH8yirDalmecWGseuFH.ss3TliivJjLDIy6Ko/u21Hk5MeFu'),
+(10, 'ops.viewer', '$2a$10$NWBTrQH8yirDalmecWGseuFH.ss3TliivJjLDIy6Ko/u21Hk5MeFu');
+
+INSERT INTO `user`
+(`user_profile_id`, `auth_user_id`, `email`, `first_name`, `last_name`, `user_role`, `phone_number`, `city`) VALUES
+(1, 1, 'admin.core@smarttms.local', 'Aditi', 'Sharma', 'ADMIN', '+91-9000000001', 'Mumbai'),
+(2, 2, 'dispatch.mumbai@smarttms.local', 'Nikhil', 'Patel', 'DISPATCHER', '+91-9000000002', 'Mumbai'),
+(3, 3, 'dispatch.bengaluru@smarttms.local', 'Priya', 'Rao', 'DISPATCHER', '+91-9000000003', 'Bengaluru'),
+(4, 4, 'driver.arjun@smarttms.local', 'Arjun', 'Singh', 'DRIVER', '+91-9000000004', 'Mumbai'),
+(5, 5, 'driver.meera@smarttms.local', 'Meera', 'Iyer', 'DRIVER', '+91-9000000005', 'Bengaluru'),
+(6, 6, 'driver.ravi@smarttms.local', 'Ravi', 'Kulkarni', 'DRIVER', '+91-9000000006', 'Pune'),
+(7, 7, 'driver.sonal@smarttms.local', 'Sonal', 'Desai', 'DRIVER', '+91-9000000007', 'Ahmedabad'),
+(8, 8, 'ops@acmemanufacturing.com', 'Karan', 'Malhotra', 'USER', '+91-9000000008', 'Jaipur'),
+(9, 9, 'logistics@retailhub.in', 'Sneha', 'Menon', 'USER', '+91-9000000009', 'Chennai'),
+(10, 10, 'ops.viewer@smarttms.local', 'Vivek', 'Kapoor', 'USER', '+91-9000000010', 'Delhi');
+
+INSERT INTO `vehicles`
+(`vehicle_id`, `driver_id`, `vehicle_name`, `vehicle_code`, `vehicle_type`, `from`, `to`, `vehicle_status`) VALUES
+(1, 4, 'Western Corridor Hauler', 'TRK-MUM-DEL-001', 'TRUCK', 'Mumbai', 'Delhi', 'IN_TRANSIT'),
+(2, 5, 'Southern Connector Mini', 'MNT-BLR-CHN-002', 'MINITRUCK', 'Bengaluru', 'Chennai', 'OCCUPIED'),
+(3, 6, 'Deccan Pickup Runner', 'PKP-PUN-NSK-003', 'PICKUP', 'Pune', 'Nashik', 'IDLE'),
+(4, 7, 'Gujarat Tempo Express', 'TMP-AHD-SUR-004', 'TEMPO', 'Ahmedabad', 'Surat', 'IDLE'),
+(5, NULL, 'Malabar Coast Carrier', 'TRK-KOC-MNG-005', 'TRUCK', 'Kochi', 'Mangaluru', 'MAINTENANCE'),
+(6, NULL, 'Legacy North Fleet', 'TRK-DEL-LKO-006', 'TRUCK', 'Delhi', 'Lucknow', 'DISCARDED');
+
+INSERT INTO `vehicle_through_points` (`vehicle_id`, `through_point`) VALUES
+(1, 'Ahmedabad'),
+(1, 'Udaipur'),
+(1, 'Jaipur'),
+(2, 'Hosur'),
+(2, 'Vellore'),
+(3, 'Chakan'),
+(3, 'Sinnar'),
+(4, 'Vadodara'),
+(4, 'Bharuch'),
+(5, 'Kozhikode'),
+(5, 'Kannur'),
+(6, 'Ghaziabad'),
+(6, 'Kanpur');
+
+INSERT INTO `orders`
+(`order_id`, `created_at`, `delivered_at`, `from_city`, `to_city`, `status`, `vehicle_id`) VALUES
+(1, '2026-04-10 07:45:00.000000', NULL, 'Mumbai', 'Jaipur', 'IN_TRANSIT', 1),
+(2, '2026-04-10 08:10:00.000000', NULL, 'Mumbai', 'Delhi', 'IN_TRANSIT', 1),
+(3, '2026-04-11 06:30:00.000000', NULL, 'Bengaluru', 'Chennai', 'ASSIGNED', 2),
+(4, '2026-04-11 07:10:00.000000', NULL, 'Bengaluru', 'Vellore', 'ASSIGNED', 2),
+(5, '2026-04-11 09:20:00.000000', NULL, 'Pune', 'Nashik', 'CREATED', NULL),
+(6, '2026-04-08 10:00:00.000000', '2026-04-09 18:40:00.000000', 'Ahmedabad', 'Surat', 'DELIVERED', 4),
+(7, '2026-04-07 11:15:00.000000', '2026-04-07 16:55:00.000000', 'Ahmedabad', 'Bharuch', 'DELIVERED', 4),
+(8, '2026-04-11 11:45:00.000000', NULL, 'Kochi', 'Kannur', 'CREATED', NULL);
+
+INSERT INTO `vehicle_orders` (`vehicle_id`, `order_id`) VALUES
+(1, 1),
+(1, 2),
+(2, 3),
+(2, 4);
+
+ALTER TABLE `auth` AUTO_INCREMENT = 11;
+ALTER TABLE `user` AUTO_INCREMENT = 11;
+ALTER TABLE `vehicles` AUTO_INCREMENT = 7;
+ALTER TABLE `orders` AUTO_INCREMENT = 9;

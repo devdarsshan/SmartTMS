@@ -2,8 +2,8 @@ package com.smartlogistics.userservice.config;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
-import org.springframework.beans.factory.annotation.Value;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -11,8 +11,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
@@ -31,24 +29,6 @@ import java.util.Map;
 @EnableCaching
 public class RedisConfig {
 
-    @Value("${spring.data.redis.host}")
-    private String redisHost;
-
-    @Value("${spring.data.redis.port}")
-    private int redisPort;
-
-    @Value("${spring.data.redis.password}")
-    private String redisPassword;
-
-    @Bean
-    public LettuceConnectionFactory redisConnectionFactory() {
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-        config.setHostName(redisHost);
-        config.setPort(redisPort);
-        config.setPassword(redisPassword);
-        return new LettuceConnectionFactory(config);
-    }
-
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
@@ -58,15 +38,7 @@ public class RedisConfig {
         template.setKeySerializer(new StringRedisSerializer());
         template.setHashKeySerializer(new StringRedisSerializer());
         
-        // Use JSON serializer for values with type information
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.activateDefaultTyping(
-            LaissezFaireSubTypeValidator.instance,
-            ObjectMapper.DefaultTyping.NON_FINAL,
-            JsonTypeInfo.As.PROPERTY
-        );
-        
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(redisObjectMapper());
         template.setValueSerializer(serializer);
         template.setHashValueSerializer(serializer);
         
@@ -76,14 +48,7 @@ public class RedisConfig {
 
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        // Configure JSON serializer for cache values
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.activateDefaultTyping(
-            LaissezFaireSubTypeValidator.instance,
-            ObjectMapper.DefaultTyping.NON_FINAL,
-            JsonTypeInfo.As.PROPERTY
-        );
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(redisObjectMapper());
 
         // Default cache configuration (10 minutes)
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
@@ -111,6 +76,17 @@ public class RedisConfig {
                 .cacheDefaults(defaultConfig)
                 .withInitialCacheConfigurations(cacheConfigurations)
                 .build();
+    }
+
+    private ObjectMapper redisObjectMapper() {
+        PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("com.smartlogistics.userservice")
+                .allowIfSubType("java.util")
+                .build();
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
+        return objectMapper;
     }
 }
 

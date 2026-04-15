@@ -90,7 +90,7 @@ auth:rate_limit:{ip}:{minute}     - Rate limiting counters
 
 ### 1. Start Redis:
 ```bash
-docker-compose -f docker-compose.redis.yml up -d
+docker compose -f docker-compose.redis.yml --env-file .env.redis up -d
 ```
 
 ### 2. Access Redis Commander:

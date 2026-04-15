@@ -8,10 +8,11 @@ import com.smartlogistics.userservice.exception.UserprofileNotFoundException;
 import com.smartlogistics.userservice.repo.UserProfileRepo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -27,9 +28,12 @@ import java.util.List;
 public class ProfileService {
     private static final Logger logger = LoggerFactory.getLogger(ProfileService.class);
 
-    public UserProfileRepo userProfileRepo;
-    public ProfileService(UserProfileRepo userProfileRepo) {
+    private final UserProfileRepo userProfileRepo;
+    private final CacheManager cacheManager;
+
+    public ProfileService(UserProfileRepo userProfileRepo, CacheManager cacheManager) {
         this.userProfileRepo = userProfileRepo;
+        this.cacheManager = cacheManager;
     }
 
     public void createUserProfile(String userIdHeader, CreateProfileRequest request) {
@@ -52,7 +56,7 @@ public class ProfileService {
         userProfileRepo.save(userProfile);
         
         // Evict role-based cache as new user is added to a role
-        evictRoleCache(userProfile.getUserRole());
+        evictUsersByRoleCache(userProfile.getUserRole());
         
         logger.info("User profile created successfully for authUserId: {}, role: {}", authUserId, userProfile.getUserRole());
     }
@@ -103,8 +107,8 @@ public class ProfileService {
 
         // If role changed, evict both old and new role caches
         if (roleChanged) {
-            evictRoleCache(oldRole);
-            evictRoleCache(userProfile.getUserRole());
+            evictUsersByRoleCache(oldRole);
+            evictUsersByRoleCache(userProfile.getUserRole());
             logger.info("User role changed from {} to {}, caches evicted", oldRole, userProfile.getUserRole());
         }
 
@@ -116,13 +120,13 @@ public class ProfileService {
      * Cache key: user:profile:{authUserId}
      * TTL: 1 hour (as per strategy)
      */
-    @Cacheable(value = "userProfiles", key = "#authUserId", unless = "#result == null || #result.body == null")
-    public ResponseEntity<UserProfile> fetchUserProfile(Long authUserId) {
+    @Cacheable(value = "userProfiles", key = "#authUserId", unless = "#result == null")
+    public UserProfile fetchUserProfile(Long authUserId) {
         logger.info("Fetching user profile from database for authUserId: {}", authUserId);
-        UserProfile userProfile =  userProfileRepo.findByAuthUserId(authUserId)
+        UserProfile userProfile = userProfileRepo.findByAuthUserId(authUserId)
                     .orElseThrow(() -> new UserprofileNotFoundException("User not found"));
         logger.info("User profile fetched successfully for authUserId: {}", authUserId);
-        return ResponseEntity.ok().body(userProfile);
+        return userProfile;
     }
 
     /**
@@ -130,20 +134,25 @@ public class ProfileService {
      * Cache key: user:role:{roleName}:list
      * TTL: 30 minutes (as per strategy)
      */
-    @Cacheable(value = "usersByRole", key = "#userRole", unless = "#result == null || #result.body == null || #result.body.isEmpty()")
-    public ResponseEntity<List<UserProfile>> fetchUserProfilesByRoles(String userRole) {
+    @Cacheable(value = "usersByRole", key = "#userRole", unless = "#result == null || #result.isEmpty()")
+    public List<UserProfile> fetchUserProfilesByRoles(String userRole) {
         logger.info("Fetching user profiles from database for role: {}", userRole);
         List<UserProfile> userProfiles = userProfileRepo.findByUserRole(userRole);
         logger.info("{} users with role {} found", userProfiles.size(), userRole);
-        return ResponseEntity.ok().body(userProfiles);
+        return userProfiles;
     }
 
     /**
      * Helper method to evict role-based cache when users are added/removed from roles.
      */
-    @CacheEvict(value = "usersByRole", key = "#userRole")
-    public void evictRoleCache(String userRole) {
-        logger.debug("Evicting cache for role: {}", userRole);
+    public void evictUsersByRoleCache(String userRole) {
+        Cache cache = cacheManager.getCache("usersByRole");
+        if (cache == null) {
+            logger.debug("Cache 'usersByRole' not configured; skipping eviction for role: {}", userRole);
+            return;
+        }
+        logger.debug("Evicting 'usersByRole' cache for role: {}", userRole);
+        cache.evict(userRole);
     }
 
     private Long parseAuthUserId(String userIdHeader) {

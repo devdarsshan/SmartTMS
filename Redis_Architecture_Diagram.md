@@ -335,7 +335,7 @@ This ensures **cache isolation** while sharing the same Redis instance.
 
 ### Start Redis
 ```bash
-docker-compose -f docker-compose.redis.yml up -d
+docker compose -f docker-compose.redis.yml --env-file .env.redis up -d
 ```
 
 ### Access Redis CLI

@@ -292,7 +292,7 @@ spring.cache.redis.time-to-live=600000
 
 **Start Redis using Docker Compose:**
 ```bash
-docker-compose -f docker-compose.redis.yml up -d
+docker compose -f docker-compose.redis.yml --env-file .env.redis up -d
 ```
 
 This will start:
@@ -301,7 +301,7 @@ This will start:
 
 **Stop Redis:**
 ```bash
-docker-compose -f docker-compose.redis.yml down
+docker compose -f docker-compose.redis.yml --env-file .env.redis down
 ```
 
 **View Redis logs:**
@@ -329,7 +329,7 @@ spring.cache.redis.time-to-live=600000
 ### Production Considerations
 
 For production deployment:
-1. **Change the default password** in `.env.redis`
+1. **Create `.env.redis` from `.env.redis.example`** and set a strong `REDIS_PASSWORD`
 2. **Enable SSL/TLS** for Redis connections
 3. **Use Redis Sentinel** or **Redis Cluster** for high availability
 4. **Configure proper backup** strategies
@@ -344,7 +344,8 @@ For production deployment:
 
 ## Getting Started
 
-1. **Start Redis**: `docker-compose -f docker-compose.redis.yml up -d`
+1. **Start Redis**: `docker compose -f docker-compose.redis.yml --env-file .env.redis up -d`
+   - First create `.env.redis` from `.env.redis.example`
 2. **Verify Redis**: Access Redis Commander at `http://localhost:8081`
 3. **Add dependencies** to your services (see Step 1 above)
 4. **Configure Redis** in each service (see Step 2-4 above)

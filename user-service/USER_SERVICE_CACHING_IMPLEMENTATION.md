@@ -217,7 +217,7 @@ DB load: ~5-10% of requests (90-95% served from cache)
 
 ### 1. Start Redis
 ```bash
-docker-compose -f docker-compose.redis.yml up -d
+docker compose -f docker-compose.redis.yml --env-file .env.redis up -d
 ```
 
 ### 2. Verify Redis is Running

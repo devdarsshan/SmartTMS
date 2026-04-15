@@ -46,13 +46,13 @@ public class UserController {
     public ResponseEntity<UserProfile> fetchUserProfile(
             @PathVariable("authUserId") Long authUserId) {
         log.info("Entering FetchUserProfile Controller");
-        return profileService.fetchUserProfile(authUserId);
+        return ResponseEntity.ok(profileService.fetchUserProfile(authUserId));
     }
 
     @GetMapping(path = "/fetchProfilesByRole/{role}")
     public ResponseEntity<List<UserProfile>> fetchUserProfilesByRoles(
             @PathVariable("role") String role) {
         log.info("Entering FetchUserProfilesByRoles Controller");
-        return profileService.fetchUserProfilesByRoles(role);
+        return ResponseEntity.ok(profileService.fetchUserProfilesByRoles(role));
     }
 }
