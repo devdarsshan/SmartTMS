@@ -11,6 +11,17 @@ It is written to fit the current SmartTMS Spring Boot microservice architecture 
 
 This PRD does not include UI plans. Notification requirements have been moved to a separate PRD.
 
+Phase 1 implementation clarifications aligned to the delivered backend:
+
+- `orderType` is implemented as a constrained enum:
+  - `CUSTOMER_ORDER`
+  - `INTERNAL_TRANSFER`
+  - `RETURN`
+- order creation remains restricted to `DISPATCHER`
+- tracking ingestion is driver-self only
+- `driverId` in tracking contracts and emitted events uses auth user id semantics from `X-User-Id`
+- `order_analytics` stores source and destination cities so route-volume metrics can be derived without reading operational tables
+
 ---
 
 ## 2. Current System Context
@@ -57,6 +68,7 @@ The current codebase already supports:
 - `tracking-service` has no APIs, no Redis logic, and no Kafka publishing
 - `analytics-service` has no consumers, no storage model, and no APIs
 - operational services do not emit domain events today
+- vehicle/driver identity semantics are not explicit enough for tracking validation
 
 ---
 
@@ -112,6 +124,11 @@ Both services must:
 - enforce role-based access where needed
 - use propagated `X-User-Id` for audit and authorization checks
 
+Phase 1 access rules:
+
+- `POST /track/location` is allowed only when the authenticated driver submits their own `driverId`
+- analytics read APIs are limited to `ADMIN` and `DISPATCHER`
+
 ---
 
 ## 6. Target Backend Architecture
@@ -143,8 +160,8 @@ Core rule:
 ## 7.1 Responsibilities
 
 - receive vehicle location updates
-- validate vehicle identity
-- validate driver-to-vehicle linkage when driver context is provided
+- validate payload and telemetry sanity on every update
+- validate vehicle and driver-to-vehicle linkage using local cache
 - store latest vehicle location in Redis
 - publish normalized location events to Kafka
 - expose latest location read APIs
@@ -153,8 +170,7 @@ Core rule:
 ## 7.2 Primary Dependencies
 
 - `vehicle-service`
-  - validate vehicle exists
-  - verify driver assignment if required
+  - provide vehicle and assignment data/events for tracking cache
 - `order-service`
   - fetch active order/vehicle relationship for order-linked tracking queries
 - Redis
@@ -187,11 +203,28 @@ Request:
 Behavior:
 
 - validate required payload fields
-- validate vehicle exists
-- validate driver is assigned to vehicle when `driverId` is provided
+- validate coordinate bounds and timestamp freshness
+- require `X-User-Id` to match request `driverId`
+- validate vehicle and driver linkage from local cache
 - write latest location to Redis
 - publish `VEHICLE_LOCATION_UPDATED` event to Kafka
 - return success only when ingestion is accepted
+
+### Validation Strategy (Phase 1)
+
+- do lightweight validation on every update
+  - required fields
+  - latitude/longitude range checks
+  - timestamp freshness checks
+- avoid calling `vehicle-service` for every location update
+- maintain local vehicle/driver assignment cache in `tracking-service`
+  - refresh cache from vehicle events and periodic sync
+- reject updates when cache indicates invalid linkage
+- if cache entry is missing, do one direct lookup and refresh cache
+
+Identity rule:
+
+- `driverId` in this API is the auth user id, not the user-profile id
 
 ### GET `/track/vehicle/{vehicleId}`
 
@@ -239,6 +272,7 @@ live:vehicle:{vehicleId}
 ### TTL
 
 - 60 seconds in phase 1
+- tune TTL to at least 2x expected heartbeat interval
 
 ## 7.5 Kafka Topic
 
@@ -258,6 +292,7 @@ vehicleId
 
 ```json
 {
+  "schemaVersion": 1,
   "eventId": "uuid",
   "eventType": "VEHICLE_LOCATION_UPDATED",
   "occurredAt": "2026-04-11T15:00:00Z",
@@ -273,17 +308,24 @@ vehicleId
 }
 ```
 
+Time rule:
+
+- `occurredAt` uses ISO-8601 UTC
+- `timestamp` uses Unix epoch seconds in UTC
+
 ## 7.7 Failure Handling
 
 - Redis write failure:
-  - log failure
-  - return degraded error or partial failure response based on implementation choice
+  - log failure and return error
 - Kafka publish failure:
-  - ingestion should fail unless an outbox/retry mechanism is introduced
+  - retry briefly, then fail ingestion if publish still fails
 - invalid vehicle or driver linkage:
   - reject request
 - stale Redis data:
   - must not be treated as active transit proof
+- ingestion response semantics:
+  - success means Redis write and Kafka publish both completed
+  - failure means update was not accepted
 
 ---
 
@@ -352,6 +394,8 @@ Analytics tables must be separate from operational tables.
 | delivery_duration_seconds | BIGINT |
 | vehicle_id | BIGINT |
 | created_by_user_id | BIGINT |
+| from_city | VARCHAR |
+| to_city | VARCHAR |
 
 ### `driver_stats`
 
@@ -375,6 +419,10 @@ Returns:
 - in-transit orders
 - delivered today
 - average delivery time
+
+Time boundary rule:
+
+- metrics like `delivered today` must be computed in UTC
 
 ### GET `/analytics/vehicle/{vehicleId}`
 
@@ -405,6 +453,29 @@ Returns:
 - delivered order count
 - total tracked distance
 
+### GET `/analytics/summary/assignment-time`
+
+Returns:
+
+- average assignment time in seconds
+
+### GET `/analytics/summary/routes`
+
+Returns:
+
+- route volume grouped by source and destination
+
+### GET `/analytics/summary/drivers`
+
+Returns:
+
+- driver utilization summary list
+- current vehicle
+- active order count
+- delivered order count
+- total tracked distance
+- lightweight utilization status like `BUSY` or `IDLE`
+
 ## 8.6 Distance Calculation
 
 For each location event:
@@ -417,6 +488,10 @@ Phase 1 recommendation:
 
 - use Haversine distance
 - ignore invalid location jumps using configurable thresholds
+
+Implementation note:
+
+- when a jump exceeds the threshold, analytics updates the last known location but does not add that jump to cumulative distance
 
 ## 8.7 Analytics Processing Rules
 
@@ -433,6 +508,9 @@ Phase 1 recommendation:
 Required changes:
 
 - add `orderType`
+- add `assignedAt`
+- add `inTransitAt`
+- keep order creation authorization restricted to `DISPATCHER`
 - emit lifecycle events:
   - `ORDER_CREATED`
   - `ORDER_ASSIGNED`
@@ -465,6 +543,10 @@ Required changes:
   - `DRIVER_UNASSIGNED_FROM_VEHICLE`
   - `VEHICLE_STATUS_UPDATED`
 - expose enough data for tracking-service to validate vehicle-driver linkage
+
+Event payload requirement for phase 1:
+
+- vehicle events should carry `vehicleId`, auth-id-based `driverId`, `vehicleStatus`, and `orderIds`
 
 ### Recommended `VEHICLE_STATUS_UPDATED` Event
 
@@ -500,6 +582,12 @@ No analytics table may become the operational source of truth.
 - analytics consumers must be idempotent
 - Kafka consumer failures must not silently lose offsets
 
+Phase 1 implementation note:
+
+- use lightweight Kafka retry and backoff settings appropriate for a personal project
+- producers should retry a few times before failing
+- consumers should retry briefly, then log and skip the bad record instead of blocking the whole listener indefinitely
+
 ### 11.2 Performance
 
 - target at least 333 tracking events/sec in phase 1
@@ -510,6 +598,10 @@ No analytics table may become the operational source of truth.
 - all external APIs must be protected by JWT
 - service logs must include actor and correlation information when available
 - sensitive user data should not be over-published in Kafka events
+
+Identity consistency rule:
+
+- `driverId` is treated as auth user id end-to-end in tracking and analytics integrations
 
 ### 11.4 Observability
 
@@ -523,7 +615,8 @@ No analytics table may become the operational source of truth.
 ## Phase 1
 
 - add order type support in `order-service`
-- update order creation authorization rules
+- add order lifecycle timestamps needed for derived analytics
+- keep order creation restricted to `DISPATCHER`
 - implement tracking ingestion and latest-location APIs
 - integrate Redis in `tracking-service`
 - integrate Kafka publishers in `order-service`, `vehicle-service`, and `tracking-service`

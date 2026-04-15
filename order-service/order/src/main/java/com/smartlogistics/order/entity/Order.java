@@ -1,6 +1,7 @@
 package com.smartlogistics.order.entity;
 
 import com.smartlogistics.order.enums.OrderStatus;
+import com.smartlogistics.order.enums.OrderType;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,10 @@ public class Order {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    private LocalDateTime assignedAt;
+
+    private LocalDateTime inTransitAt;
+
     private LocalDateTime deliveredAt;
 
     @Column(name = "from_city", nullable = false)
@@ -27,6 +32,10 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.CREATED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private OrderType orderType;
 
     private Long vehicleId;
 
@@ -54,6 +63,22 @@ public class Order {
         this.deliveredAt = deliveredAt;
     }
 
+    public LocalDateTime getAssignedAt() {
+        return assignedAt;
+    }
+
+    public void setAssignedAt(LocalDateTime assignedAt) {
+        this.assignedAt = assignedAt;
+    }
+
+    public LocalDateTime getInTransitAt() {
+        return inTransitAt;
+    }
+
+    public void setInTransitAt(LocalDateTime inTransitAt) {
+        this.inTransitAt = inTransitAt;
+    }
+
     public String getFrom() {
         return from;
     }
@@ -76,6 +101,14 @@ public class Order {
 
     public void setStatus(OrderStatus status) {
         this.status = status;
+    }
+
+    public OrderType getOrderType() {
+        return orderType;
+    }
+
+    public void setOrderType(OrderType orderType) {
+        this.orderType = orderType;
     }
 
     public Long getVehicleId() {

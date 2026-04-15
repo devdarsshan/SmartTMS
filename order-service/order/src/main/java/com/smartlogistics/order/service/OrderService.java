@@ -7,6 +7,7 @@ import com.smartlogistics.order.dto.VehicleDTO;
 import com.smartlogistics.order.entity.Order;
 import com.smartlogistics.order.enums.OrderStatus;
 import com.smartlogistics.order.enums.VehicleStatus;
+import com.smartlogistics.order.events.OrderEventPublisher;
 import com.smartlogistics.order.exceptions.InvalidOrderStateException;
 import com.smartlogistics.order.exceptions.NoVehicleAvailableException;
 import com.smartlogistics.order.exceptions.OrderNotFoundException;
@@ -16,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,15 +29,19 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final UserServiceClient userServiceClient;
     private final VehicleServiceClient vehicleServiceClient;
+    private final OrderEventPublisher orderEventPublisher;
 
     public OrderService(OrderRepository orderRepository,
                         UserServiceClient userServiceClient,
-                        VehicleServiceClient vehicleServiceClient) {
+                        VehicleServiceClient vehicleServiceClient,
+                        OrderEventPublisher orderEventPublisher) {
         this.orderRepository = orderRepository;
         this.userServiceClient = userServiceClient;
         this.vehicleServiceClient = vehicleServiceClient;
+        this.orderEventPublisher = orderEventPublisher;
     }
 
+    @Transactional
     public Order createOrder(CreateOrderRequest request, String userIdHeader) {
         logger.info("Creating order from {} to {}", request.getFrom(), request.getTo());
         Long authUserId = parseAuthUserId(userIdHeader);
@@ -50,9 +56,14 @@ public class OrderService {
         order.setTo(request.getTo());
         order.setCreatedAt(LocalDateTime.now());
         order.setStatus(OrderStatus.CREATED);
-        return orderRepository.save(order);
+        order.setOrderType(request.getOrderType());
+
+        Order savedOrder = orderRepository.save(order);
+        orderEventPublisher.publishOrderCreated(savedOrder, authUserId, userProfile.getUserRole());
+        return savedOrder;
     }
 
+    @Transactional
     public Order assignOrder(Long orderId) {
         logger.info("Assigning vehicle for order {}", orderId);
         Order order = getOrderEntity(orderId);
@@ -70,9 +81,14 @@ public class OrderService {
 
         order.setVehicleId(selectedVehicle.getVehicleId());
         order.setStatus(OrderStatus.ASSIGNED);
-        return orderRepository.save(order);
+        order.setAssignedAt(LocalDateTime.now());
+
+        Order savedOrder = orderRepository.save(order);
+        orderEventPublisher.publishOrderAssigned(savedOrder);
+        return savedOrder;
     }
 
+    @Transactional
     public Order updateOrderStatus(Long orderId, UpdateOrderStatusRequest request) {
         logger.info("Updating status for order {} to {}", orderId, request.getStatus());
         Order order = getOrderEntity(orderId);
@@ -95,7 +111,10 @@ public class OrderService {
             }
             vehicleServiceClient.updateVehicleStatus(order.getVehicleId(), VehicleStatus.IN_TRANSIT);
             order.setStatus(OrderStatus.IN_TRANSIT);
-            return orderRepository.save(order);
+            order.setInTransitAt(LocalDateTime.now());
+            Order savedOrder = orderRepository.save(order);
+            orderEventPublisher.publishOrderInTransit(savedOrder);
+            return savedOrder;
         }
 
         if (order.getStatus() != OrderStatus.ASSIGNED && order.getStatus() != OrderStatus.IN_TRANSIT) {
@@ -105,7 +124,9 @@ public class OrderService {
         vehicleServiceClient.removeOrderFromVehicle(order.getVehicleId(), orderId);
         order.setStatus(OrderStatus.DELIVERED);
         order.setDeliveredAt(LocalDateTime.now());
-        return orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+        orderEventPublisher.publishOrderDelivered(savedOrder);
+        return savedOrder;
     }
 
     public ResponseEntity<Order> fetchOrder(Long orderId) {

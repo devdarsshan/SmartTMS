@@ -2,6 +2,7 @@ package com.smartlogistics.vehicleservice.dto;
 
 public class DriverInfoDTO {
     private Long userProfileId;
+    private Long authUserId;
     private String firstName;
     private String lastName;
     private String email;
@@ -11,8 +12,9 @@ public class DriverInfoDTO {
 
     public DriverInfoDTO() {}
 
-    public DriverInfoDTO(Long userProfileId, String firstName, String lastName, String email, String phoneNumber, String city, String userRole) {
+    public DriverInfoDTO(Long userProfileId, Long authUserId, String firstName, String lastName, String email, String phoneNumber, String city, String userRole) {
         this.userProfileId = userProfileId;
+        this.authUserId = authUserId;
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
@@ -27,6 +29,14 @@ public class DriverInfoDTO {
 
     public void setUserProfileId(Long userProfileId) {
         this.userProfileId = userProfileId;
+    }
+
+    public Long getAuthUserId() {
+        return authUserId;
+    }
+
+    public void setAuthUserId(Long authUserId) {
+        this.authUserId = authUserId;
     }
 
     public String getFirstName() {

@@ -1,0 +1,21 @@
+1. Simple:
+python scripts/live_location_provider.py \
+  --username driver.arjun \
+  --password Driver@123 \
+  --vehicle-id 1
+
+2. Custom route:
+python scripts/live_location_provider.py \
+  --username driver.arjun \
+  --password Driver@123 \
+  --vehicle-id 1 \
+  --start-lat 19.0760 \
+  --start-lng 72.8777 \
+  --interval 2
+
+3. inline points:
+python scripts/live_location_provider.py \
+  --username driver.arjun \
+  --password Driver@123 \
+  --vehicle-id 1 \
+  --points "19.0760,72.8777;19.1200,72.8950;19.1650,72.9300"

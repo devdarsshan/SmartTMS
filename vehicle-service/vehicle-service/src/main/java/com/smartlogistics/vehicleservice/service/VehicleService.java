@@ -3,6 +3,7 @@ package com.smartlogistics.vehicleservice.service;
 import com.smartlogistics.vehicleservice.enums.VehicleStatus;
 import com.smartlogistics.vehicleservice.enums.VehicleType;
 import com.smartlogistics.vehicleservice.exceptions.*;
+import com.smartlogistics.vehicleservice.events.VehicleEventPublisher;
 import com.smartlogistics.vehicleservice.dto.*;
 import com.smartlogistics.vehicleservice.entity.Vehicle;
 import com.smartlogistics.vehicleservice.repo.VehicleRepositiory;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -24,10 +26,14 @@ public class VehicleService {
 
     private final VehicleRepositiory vehicleRepositiory;
     private final UserServiceClient userServiceClient;
+    private final VehicleEventPublisher vehicleEventPublisher;
 
-    public VehicleService(VehicleRepositiory vehicleRepositiory, UserServiceClient userServiceClient) {
+    public VehicleService(VehicleRepositiory vehicleRepositiory,
+                          UserServiceClient userServiceClient,
+                          VehicleEventPublisher vehicleEventPublisher) {
         this.vehicleRepositiory = vehicleRepositiory;
         this.userServiceClient = userServiceClient;
+        this.vehicleEventPublisher = vehicleEventPublisher;
     }
 
     public void createVehicle(CreateVehicleRequest request) {
@@ -48,6 +54,7 @@ public class VehicleService {
         logger.info("Vehicle created");
     }
 
+    @Transactional
     public Vehicle updateVehicle(Vehicle vehicle) {
         logger.info("Entering UpdateVehicle");
         Vehicle existingVehicle = vehicleRepositiory.findById(vehicle.getVehicleId()).orElse(null);
@@ -66,6 +73,7 @@ public class VehicleService {
         }
         syncVehicleStatusWithOrders(vehicle);
         Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
+        vehicleEventPublisher.publishVehicleStatusUpdated(updatedVehicle);
         logger.info("Vehicle updated");
         return updatedVehicle;
     }
@@ -100,6 +108,7 @@ public class VehicleService {
         return ResponseEntity.ok(vehicles);
     }
 
+    @Transactional
     public Vehicle assignOrderToVehicle(Long vehicleId, Long orderId) {
         logger.info("Assigning order {} to vehicle {}", orderId, vehicleId);
         Vehicle vehicle = getVehicleById(vehicleId);
@@ -116,9 +125,12 @@ public class VehicleService {
         if (vehicle.getVehicleStatus() == VehicleStatus.IDLE) {
             vehicle.setVehicleStatus(VehicleStatus.OCCUPIED);
         }
-        return vehicleRepositiory.save(vehicle);
+        Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
+        vehicleEventPublisher.publishVehicleStatusUpdated(updatedVehicle);
+        return updatedVehicle;
     }
 
+    @Transactional
     public Vehicle removeOrderFromVehicle(Long vehicleId, Long orderId) {
         logger.info("Removing order {} from vehicle {}", orderId, vehicleId);
         Vehicle vehicle = getVehicleById(vehicleId);
@@ -130,9 +142,12 @@ public class VehicleService {
             throw new InvalidOperationException("Order " + orderId + " is not assigned to vehicle " + vehicleId);
         }
         syncVehicleStatusWithOrders(vehicle);
-        return vehicleRepositiory.save(vehicle);
+        Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
+        vehicleEventPublisher.publishVehicleStatusUpdated(updatedVehicle);
+        return updatedVehicle;
     }
 
+    @Transactional
     public Vehicle updateVehicleStatus(Long vehicleId, VehicleStatus vehicleStatus) {
         logger.info("Updating vehicle {} status to {}", vehicleId, vehicleStatus);
         Vehicle vehicle = getVehicleById(vehicleId);
@@ -149,9 +164,12 @@ public class VehicleService {
             throw new InvalidOperationException("Vehicle cannot move to IDLE while orders are still assigned");
         }
         vehicle.setVehicleStatus(vehicleStatus);
-        return vehicleRepositiory.save(vehicle);
+        Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
+        vehicleEventPublisher.publishVehicleStatusUpdated(updatedVehicle);
+        return updatedVehicle;
     }
 
+    @Transactional
     public VehicleWithDriverDTO assignDriverToVehicle(Long vehicleId, Long driverId) {
         logger.info("Entering assignDriverToVehicle with vehicleId: {} and driverId: {}", vehicleId, driverId);
 
@@ -181,11 +199,13 @@ public class VehicleService {
 
         vehicle.setDriverId(driverId);
         Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
+        vehicleEventPublisher.publishDriverAssigned(updatedVehicle);
 
         logger.info("Driver assigned to vehicle successfully");
         return mapToVehicleWithDriverDTO(updatedVehicle, driverInfo);
     }
 
+    @Transactional
     public VehicleWithDriverDTO unassignDriverFromVehicle(Long vehicleId) {
         logger.info("Entering unassignDriverFromVehicle with vehicleId: {}", vehicleId);
         
@@ -199,7 +219,9 @@ public class VehicleService {
         vehicle.setDriverId(null);
         syncVehicleStatusWithOrders(vehicle);
         Vehicle updatedVehicle = vehicleRepositiory.save(vehicle);
-        
+        vehicleEventPublisher.publishDriverUnassigned(updatedVehicle, driverId);
+        vehicleEventPublisher.publishVehicleStatusUpdated(updatedVehicle);
+
         logger.info("Driver unassigned from vehicle successfully");
         
         DriverInfoDTO driverInfo = userServiceClient.getDriverInfo(driverId);
