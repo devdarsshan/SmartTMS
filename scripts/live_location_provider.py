@@ -31,6 +31,7 @@ import argparse
 import csv
 import json
 import math
+import socket
 import sys
 import time
 from dataclasses import dataclass
@@ -43,6 +44,7 @@ DEFAULT_BASE_URL = "http://localhost:7082"
 DEFAULT_INTERVAL_SECONDS = 2.0
 DEFAULT_SPEED = 35.0
 DEFAULT_TIMEOUT_SECONDS = 10.0
+DEFAULT_HTTP_RETRIES = 2
 DEFAULT_ROUTE_RADIUS_METERS = 750.0
 DEFAULT_GENERATED_POINTS = 16
 
@@ -466,15 +468,28 @@ def http_json(
         data = json.dumps(body).encode("utf-8")
 
     req = request.Request(url=url, data=data, headers=headers, method=method)
-    try:
-        with request.urlopen(req, timeout=timeout) as response:
-            raw = response.read().decode("utf-8")
-            return json.loads(raw) if raw else {}
-    except error.HTTPError as exc:
-        raw = exc.read().decode("utf-8", errors="replace")
-        raise SystemExit(f"HTTP {exc.code} calling {url}: {raw}") from exc
-    except error.URLError as exc:
-        raise SystemExit(f"Network error calling {url}: {exc.reason}") from exc
+
+    for attempt in range(1, DEFAULT_HTTP_RETRIES + 1):
+        try:
+            with request.urlopen(req, timeout=timeout) as response:
+                raw = response.read().decode("utf-8")
+                return json.loads(raw) if raw else {}
+        except error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", errors="replace")
+            raise SystemExit(f"HTTP {exc.code} calling {url}: {raw}") from exc
+        except (TimeoutError, socket.timeout) as exc:
+            if attempt < DEFAULT_HTTP_RETRIES:
+                time.sleep(0.5)
+                continue
+            raise SystemExit(
+                f"Timeout calling {url} after {DEFAULT_HTTP_RETRIES} attempt(s). "
+                f"Try increasing --timeout (current: {timeout}s)."
+            ) from exc
+        except error.URLError as exc:
+            if "timed out" in str(exc.reason).lower() and attempt < DEFAULT_HTTP_RETRIES:
+                time.sleep(0.5)
+                continue
+            raise SystemExit(f"Network error calling {url}: {exc.reason}") from exc
 
 
 if __name__ == "__main__":

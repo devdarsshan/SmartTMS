@@ -3,6 +3,7 @@ python scripts/live_location_provider.py \
   --username driver.arjun \
   --password Driver@123 \
   --vehicle-id 1
+  --timeout 30
 
 2. Custom route:
 python scripts/live_location_provider.py \
