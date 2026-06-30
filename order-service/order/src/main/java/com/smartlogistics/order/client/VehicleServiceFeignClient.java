@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@FeignClient(name = "vehicle-service")
+@FeignClient(name = "vehicle-service", fallback = VehicleServiceFallback.class)
 public interface VehicleServiceFeignClient {
 
     @GetMapping("/vehicle/route-match")

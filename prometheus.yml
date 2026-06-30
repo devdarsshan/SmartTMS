@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'smart-tms'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:7082', 'host.docker.internal:7081', 'host.docker.internal:7083', 'host.docker.internal:7084', 'host.docker.internal:7085', 'host.docker.internal:7086', 'host.docker.internal:7087']

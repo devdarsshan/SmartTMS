@@ -1,0 +1,28 @@
+server:
+  port: 7085
+
+spring:
+  application:
+    name: ai-agent-service
+  ai:
+    vertex:
+      ai:
+        gemini:
+          project-id: ${VERTEX_AI_PROJECT_ID:your-gcp-project-id}
+          location: ${VERTEX_AI_LOCATION:us-central1}
+          chat:
+            options:
+              model: gemini-1.5-pro
+
+    mcp:
+      server:
+        type: sse
+        sse:
+          path: /mcp/sse
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true

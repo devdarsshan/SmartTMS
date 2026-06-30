@@ -20,6 +20,9 @@
         <module>tracking-service/tracking</module>
         <module>user-service/user-service</module>
         <module>vehicle-service/vehicle-service</module>
+        <module>ai-agent-service/ai-agent</module>
+        <module>config-server</module>
+        <module>notification-service</module>
     </modules>
 
     <properties>
